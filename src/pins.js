@@ -16,8 +16,10 @@ const REASONS = [
 export function createPinSystem({ scene, camera, domElement, controls, getSelectedFloor }) {
   const state = {
     pins: [],
+    localPins: [],
     pinMode: false,
     activeFloor: getSelectedFloor(),
+    pendingMesh: null,
   }
 
   const pinGroup = new THREE.Group()
@@ -27,31 +29,44 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   const pointer = new THREE.Vector2()
 
   const ui = createPinUi()
-  const { panel, toggleButton, list, backdrop, form, closeButton, submitButton, notice } = ui
+  const { panel, toggleButton, backdrop, form, closeButton, submitButton } = ui
 
   toggleButton.addEventListener('click', () => {
     state.pinMode = !state.pinMode
     toggleButton.classList.toggle('active', state.pinMode)
+    toggleButton.textContent = state.pinMode ? 'Pin platzieren' : '+ Pin'
     controls.enabled = !state.pinMode
+    document.body.classList.toggle('pin-mode', state.pinMode)
   })
 
   domElement.addEventListener('pointerdown', (event) => {
-    if (!state.pinMode) return
     if (event.button !== 0) return
     if (event.target.closest('.ui')) return
-
-    const floorIndex = getSelectedFloor()
-    const planeY = getFloorSlabTopY(floorIndex)
 
     const rect = domElement.getBoundingClientRect()
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(pointer, camera)
 
+    if (!state.pinMode) {
+      const hits = raycaster.intersectObjects(pinGroup.children, true)
+      if (hits.length) {
+        const pin = hits[0].object.userData.pinData
+        if (pin) {
+          openForm({ pin })
+        }
+      }
+      return
+    }
+
+    const floorIndex = getSelectedFloor()
+    const planeY = getFloorSlabTopY(floorIndex)
+
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY)
     const point = new THREE.Vector3()
     if (!raycaster.ray.intersectPlane(plane, point)) return
 
+    placePendingPin({ floorIndex, position: point })
     openForm({ floorIndex, position: point })
   })
 
@@ -67,14 +82,13 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
     try {
       const saved = await createPin(payload)
+      finalizePendingPin(saved)
       await loadPins()
-      if (!saved.approved) {
-        setNotice('Pin gespeichert. Freigabe erfolgt durch Admin.')
-      }
       closeForm()
       state.pinMode = false
       toggleButton.classList.remove('active')
       controls.enabled = true
+      document.body.classList.remove('pin-mode')
     } catch (error) {
       showFormError('Speichern fehlgeschlagen')
     }
@@ -93,20 +107,24 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   async function loadPins() {
     try {
       state.pins = await fetchPins()
+      state.localPins = state.localPins.filter(
+        (pin) => !state.pins.some((approvedPin) => approvedPin.id === pin.id)
+      )
       renderPins()
-      renderList()
     } catch (error) {
-      renderList(true)
+      // keep existing pins
     }
   }
 
   function renderPins() {
     pinGroup.clear()
-    state.pins.forEach((pin) => {
-      const mesh = createPinMesh()
+    const allPins = [...state.pins, ...state.localPins]
+    allPins.forEach((pin) => {
+      const mesh = createPinMesh(pin.approved === 0)
       mesh.position.set(pin.position_x, pin.position_y + 0.2, pin.position_z)
       mesh.userData.floorIndex = pin.floor_index
       mesh.userData.pinId = pin.id
+      mesh.userData.pinData = pin
       pinGroup.add(mesh)
     })
     updatePinVisibility()
@@ -119,55 +137,20 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     })
   }
 
-  function renderList(isError = false) {
-    list.innerHTML = ''
-    if (state.notice) {
-      notice.textContent = state.notice
-      notice.classList.add('is-visible')
-    } else {
-      notice.textContent = ''
-      notice.classList.remove('is-visible')
-    }
-    if (isError) {
-      const item = document.createElement('div')
-      item.className = 'ui-pin-empty'
-      item.textContent = 'Pins konnten nicht geladen werden'
-      list.appendChild(item)
-      return
-    }
-
-    if (!state.pins.length) {
-      const item = document.createElement('div')
-      item.className = 'ui-pin-empty'
-      item.textContent = 'Noch keine Pins'
-      list.appendChild(item)
-      return
-    }
-
-    state.pins.forEach((pin) => {
-      const item = document.createElement('button')
-      item.type = 'button'
-      item.className = 'ui-pin-item'
-      item.textContent = `Floor ${pin.floor_index} · ${pin.wellbeing}/10`
-      item.addEventListener('click', () => openForm({ pin }))
-      list.appendChild(item)
-    })
-  }
-
-  function createPinMesh() {
+  function createPinMesh(isPending = false) {
     const geometry = new THREE.ConeGeometry(0.18, 0.5, 12)
-    const material = new THREE.MeshStandardMaterial({ color: 0xf97316 })
+    const material = new THREE.MeshStandardMaterial({ color: isPending ? 0xfbbf24 : 0xf97316 })
     return new THREE.Mesh(geometry, material)
   }
 
   function openForm({ floorIndex, position, pin }) {
     form.reset()
     clearFormError()
-    setNotice('')
     form.dataset.mode = pin ? 'view' : 'create'
 
     const fields = form.elements
     if (pin) {
+      closeButton.textContent = 'Schliessen'
       fields.wellbeing.value = pin.wellbeing
       fields.note.value = pin.note || ''
       const reasons = safeParseReasons(pin.reasons)
@@ -180,7 +163,9 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         checkbox.disabled = true
       })
       submitButton.disabled = true
+      submitButton.classList.add('is-hidden')
     } else {
+      closeButton.textContent = 'Abbrechen'
       fields.wellbeing.disabled = false
       fields.note.disabled = false
       Array.from(fields.reasons).forEach((checkbox) => {
@@ -188,6 +173,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         checkbox.checked = false
       })
       submitButton.disabled = false
+      submitButton.classList.remove('is-hidden')
       form.dataset.floorIndex = floorIndex
       form.dataset.x = position.x
       form.dataset.y = position.y
@@ -203,6 +189,9 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     form.dataset.x = ''
     form.dataset.y = ''
     form.dataset.z = ''
+    if (form.dataset.mode === 'create') {
+      removePendingPin()
+    }
   }
 
   function collectFormData() {
@@ -255,10 +244,38 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     }
   }
 
-  function setNotice(message) {
-    state.notice = message
-    notice.textContent = message
-    notice.classList.toggle('is-visible', Boolean(message))
+  function placePendingPin({ floorIndex, position }) {
+    removePendingPin()
+    const mesh = createPinMesh(true)
+    mesh.position.set(position.x, position.y + 0.2, position.z)
+    mesh.userData.floorIndex = floorIndex
+    mesh.userData.pinData = {
+      id: `local-${Date.now()}`,
+      floor_index: floorIndex,
+      position_x: position.x,
+      position_y: position.y,
+      position_z: position.z,
+      wellbeing: 0,
+      reasons: [],
+      note: '',
+      approved: 0,
+    }
+    pinGroup.add(mesh)
+    state.pendingMesh = mesh
+  }
+
+  function removePendingPin() {
+    if (!state.pendingMesh) return
+    pinGroup.remove(state.pendingMesh)
+    state.pendingMesh = null
+  }
+
+  function finalizePendingPin(savedPin) {
+    removePendingPin()
+    if (savedPin && savedPin.approved === 0) {
+      state.localPins.unshift(savedPin)
+    }
+    renderPins()
   }
 }
 
@@ -271,10 +288,6 @@ function createPinUi() {
   toggleButton.className = 'ui-pin-toggle'
   toggleButton.textContent = '+ Pin'
   panel.appendChild(toggleButton)
-
-  const list = document.createElement('div')
-  list.className = 'ui-pin-list'
-  panel.appendChild(list)
 
   const backdrop = document.createElement('div')
   backdrop.className = 'ui-modal-backdrop'
@@ -352,11 +365,7 @@ function createPinUi() {
   submitButton.textContent = 'Speichern'
   form.appendChild(submitButton)
 
-  const notice = document.createElement('div')
-  notice.className = 'ui-pin-notice'
-  panel.appendChild(notice)
-
   document.body.appendChild(backdrop)
 
-  return { panel, toggleButton, list, backdrop, form, closeButton, submitButton, notice }
+  return { panel, toggleButton, backdrop, form, closeButton, submitButton }
 }

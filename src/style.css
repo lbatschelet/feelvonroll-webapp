@@ -70,46 +70,24 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
+  padding: 8px;
   background: rgba(255, 255, 255, 0.92);
   border-radius: 16px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
   backdrop-filter: blur(6px);
-  min-width: 160px;
-  max-width: 220px;
 }
 
 .ui-pin-toggle {
   font-weight: 600;
 }
 
-.ui-pin-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 220px;
-  overflow: auto;
+.ui-pin-toggle.active {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
-.ui-pin-item {
-  text-align: left;
-  border-radius: 10px;
-  background: #f1f5f9;
-}
-
-.ui-pin-empty {
-  font-size: 0.85rem;
-  color: #6b7280;
-}
-
-.ui-pin-notice {
-  display: none;
-  font-size: 0.8rem;
-  color: #2563eb;
-}
-
-.ui-pin-notice.is-visible {
-  display: block;
+.pin-mode canvas {
+  cursor: crosshair;
 }
 
 .ui-modal-backdrop {
@@ -193,6 +171,10 @@ canvas {
 .ui-form-submit:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.ui-form-submit.is-hidden {
+  display: none;
 }
 
 button {
