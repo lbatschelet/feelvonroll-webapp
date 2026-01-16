@@ -110,6 +110,20 @@ canvas {
   color: #475569;
 }
 
+.ui-legend-gradient {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.ui-legend-labels {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
 .ui-legend-item {
   display: inline-flex;
   align-items: center;
@@ -151,16 +165,33 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  padding-top: 28px;
 }
 
-.ui-modal-header {
-  font-weight: 700;
-  font-size: 1rem;
-}
 
 .ui-modal-close {
-  align-self: flex-end;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
   background: #e2e8f0;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-modal-close svg {
+  width: 18px;
+  height: 18px;
+  stroke: #111827;
+  stroke-width: 2;
+  fill: none;
 }
 
 .ui-form {
@@ -170,35 +201,42 @@ canvas {
   font-size: 0.85rem;
 }
 
+.ui-form input[type='range'] {
+  accent-color: var(--pin-accent, #1f2937);
+  width: 100%;
+}
+
+.ui-form-question {
+  font-weight: 700;
+  display: block;
+}
+
 .ui-form-group.is-hidden {
   display: none;
 }
 
 .ui-form-section {
-  font-weight: 600;
+  font-weight: 700;
   margin-top: 4px;
-}
-
-.ui-preview {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 0.8rem;
-  color: #475569;
-}
-
-.ui-preview-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: #94a3b8;
 }
 
 .ui-form-reasons {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px 10px;
+  margin-top: 6px;
+}
+
+.ui-form-reasons .ui-checkbox span {
+  font-weight: 400;
+}
+
+.ui-slider-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 4px;
 }
 
 .ui-checkbox {
@@ -213,6 +251,8 @@ canvas {
   border: 1px solid #e2e8f0;
   padding: 8px;
   font-family: inherit;
+  margin-top: 6px;
+  width: 100%;
 }
 
 .ui-form-error {
@@ -239,6 +279,42 @@ canvas {
   gap: 8px;
   font-size: 0.85rem;
   color: #1f2937;
+}
+
+.ui-pin-view-score-row {
+  display: grid;
+  gap: 6px;
+}
+
+.ui-pin-view-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.ui-pin-view-bar-fill {
+  display: block;
+  height: 100%;
+  background: #1f2937;
+  width: 0%;
+}
+
+.ui-pin-view-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+  display: grid;
+  gap: 4px;
+}
+
+.ui-pin-view-pending {
+  display: none;
+  color: #b45309;
+}
+
+.ui-pin-view-timestamp[data-pending='true'] ~ .ui-pin-view-pending {
+  display: inline;
 }
 
 .ui-pin-view.is-hidden {

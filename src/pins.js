@@ -21,10 +21,13 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     activeFloor: getSelectedFloor(),
     pendingMesh: null,
     colorMode: 'wellbeing',
+    lastClusterDistance: null,
   }
 
   const pinGroup = new THREE.Group()
   scene.add(pinGroup)
+
+  const clusterTextureCache = new Map()
 
   const raycaster = new THREE.Raycaster()
   const pointer = new THREE.Vector2()
@@ -39,12 +42,12 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     submitButton,
     colorModeButtons,
     legend,
-    previewDot,
     viewPanel,
     viewWellbeing,
     viewReasons,
     viewNote,
-    viewStatus,
+    viewTimestamp,
+    viewScoreFill,
     formGroups,
   } = ui
 
@@ -139,7 +142,11 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       renderPins()
     },
     update: () => {
-      renderPins()
+      const distance = camera.position.distanceTo(controls.target)
+      if (state.lastClusterDistance === null || Math.abs(distance - state.lastClusterDistance) > 0.6) {
+        state.lastClusterDistance = distance
+        renderPins()
+      }
     },
   }
 
@@ -219,7 +226,6 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
     const fields = form.elements
     if (pin) {
-      closeButton.textContent = 'Schliessen'
       fields.wellbeing.value = pin.wellbeing
       fields.note.value = pin.note || ''
       const reasons = safeParseReasons(pin.reasons)
@@ -236,11 +242,12 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       formGroups.forEach((group) => group.classList.add('is-hidden'))
       viewPanel.classList.remove('is-hidden')
       viewWellbeing.textContent = `${pin.wellbeing}/10`
+      viewScoreFill.style.width = `${Math.min(Math.max((pin.wellbeing / 10) * 100, 0), 100)}%`
       viewReasons.textContent = reasons.length ? reasons.join(', ') : '—'
       viewNote.textContent = pin.note?.trim() ? pin.note : '—'
-      viewStatus.textContent = getStatusLabel(pin.approved)
+      viewTimestamp.textContent = formatTimestamp(pin.created_at)
+      viewTimestamp.dataset.pending = isLocalPin(pin.id) && pin.approved === 0 ? 'true' : 'false'
     } else {
-      closeButton.textContent = 'Abbrechen'
       fields.wellbeing.disabled = false
       fields.note.disabled = false
       Array.from(fields.reasons).forEach((checkbox) => {
@@ -399,11 +406,21 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   }
 
   function getWellbeingColor(value) {
+    const palette = [
+      '#440154',
+      '#482475',
+      '#414487',
+      '#355f8d',
+      '#2a788e',
+      '#21908d',
+      '#22a884',
+      '#42be71',
+      '#7ad151',
+      '#bddf26',
+    ]
     const score = Number(value || 0)
-    const t = Math.min(Math.max((score - 1) / 9, 0), 1)
-    const start = new THREE.Color(0xef4444)
-    const end = new THREE.Color(0x22c55e)
-    return start.lerp(end, t)
+    const index = Math.min(Math.max(Math.round(score) - 1, 0), 9)
+    return new THREE.Color(palette[index])
   }
 
   function getReasonColor(reasons) {
@@ -427,16 +444,15 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   function updateLegend() {
     legend.innerHTML = ''
     if (state.colorMode === 'wellbeing') {
-      const steps = [
-        { label: '1-2', value: 1.5 },
-        { label: '3-4', value: 3.5 },
-        { label: '5-6', value: 5.5 },
-        { label: '7-8', value: 7.5 },
-        { label: '9-10', value: 9.5 },
-      ]
-      steps.forEach((step) => {
-        legend.appendChild(createLegendItem(step.label, getWellbeingColor(step.value)))
-      })
+      const gradient = document.createElement('div')
+      gradient.className = 'ui-legend-gradient'
+      gradient.style.background =
+        'linear-gradient(90deg, #440154, #482475, #414487, #355f8d, #2a788e, #21908d, #22a884, #42be71, #7ad151, #bddf26)'
+      const labels = document.createElement('div')
+      labels.className = 'ui-legend-labels'
+      labels.innerHTML = '<span>Gar nicht wohl</span><span>Sehr wohl</span>'
+      legend.appendChild(gradient)
+      legend.appendChild(labels)
       return
     }
 
@@ -469,15 +485,19 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   }
 
   function updatePreviewColor() {
-    if (!previewDot) return
     const color = getColorFromForm()
-    previewDot.style.background = color.getStyle()
+    form.style.setProperty('--pin-accent', color.getStyle())
   }
 
-  function getStatusLabel(status) {
-    if (status === 1) return 'Freigegeben'
-    if (status === -1) return 'Abgelehnt'
-    return 'Wartet auf Freigabe'
+  function formatTimestamp(value) {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString('de-CH')
+  }
+
+  function isLocalPin(id) {
+    return state.localPins.some((pin) => pin.id === id)
   }
 
   function buildClusters(pins) {
@@ -509,7 +529,8 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         clusters.push({
           pins: [pin],
           screen,
-          worldPosition: world,
+          worldSum: world.clone(),
+          worldPosition: world.clone(),
         })
       } else {
         targetCluster.pins.push(pin)
@@ -519,8 +540,8 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         targetCluster.screen.y =
           (targetCluster.screen.y * (targetCluster.pins.length - 1) + screen.y) /
           targetCluster.pins.length
-        targetCluster.worldPosition.add(world)
-        targetCluster.worldPosition.multiplyScalar(1 / targetCluster.pins.length)
+        targetCluster.worldSum.add(world)
+        targetCluster.worldPosition.copy(targetCluster.worldSum).multiplyScalar(1 / targetCluster.pins.length)
       }
     })
 
@@ -532,10 +553,15 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true })
     const sprite = new THREE.Sprite(material)
     sprite.scale.set(0.7, 0.7, 1)
+    sprite.position.y += 0.5
+    sprite.material.depthTest = false
     return sprite
   }
 
   function createClusterTexture(count) {
+    if (clusterTextureCache.has(count)) {
+      return clusterTextureCache.get(count)
+    }
     const size = 128
     const canvas = document.createElement('canvas')
     canvas.width = size
@@ -551,7 +577,9 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(count), size / 2, size / 2)
-    return new THREE.CanvasTexture(canvas)
+    const texture = new THREE.CanvasTexture(canvas)
+    clusterTextureCache.set(count, texture)
+    return texture
   }
 }
 
@@ -594,15 +622,15 @@ function createPinUi() {
   modal.className = 'ui-modal'
   backdrop.appendChild(modal)
 
-  const header = document.createElement('div')
-  header.className = 'ui-modal-header'
-  header.textContent = 'Wohlbefinden'
-  modal.appendChild(header)
-
   const closeButton = document.createElement('button')
   closeButton.type = 'button'
   closeButton.className = 'ui-modal-close'
-  closeButton.textContent = 'Schliessen'
+  closeButton.setAttribute('aria-label', 'Schliessen')
+  closeButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 6l12 12M18 6l-12 12" />
+    </svg>
+  `
   modal.appendChild(closeButton)
 
   const form = document.createElement('form')
@@ -613,17 +641,10 @@ function createPinUi() {
   wellbeingGroup.className = 'ui-form-group'
   form.appendChild(wellbeingGroup)
 
-  const wellbeingLabel = document.createElement('label')
+  const wellbeingLabel = document.createElement('div')
+  wellbeingLabel.className = 'ui-form-question'
   wellbeingLabel.textContent = 'Wie fühlst du dich hier?'
   wellbeingGroup.appendChild(wellbeingLabel)
-
-  const preview = document.createElement('div')
-  preview.className = 'ui-preview'
-  preview.innerHTML = `
-    <span>Farbe</span>
-    <span class="ui-preview-dot"></span>
-  `
-  wellbeingGroup.appendChild(preview)
 
   const wellbeingInput = document.createElement('input')
   wellbeingInput.type = 'range'
@@ -633,13 +654,21 @@ function createPinUi() {
   wellbeingInput.value = '6'
   wellbeingGroup.appendChild(wellbeingInput)
 
+  const wellbeingLegend = document.createElement('div')
+  wellbeingLegend.className = 'ui-slider-legend'
+  wellbeingLegend.innerHTML = `
+    <span>Gar nicht wohl</span>
+    <span>Sehr wohl</span>
+  `
+  wellbeingGroup.appendChild(wellbeingLegend)
+
   const reasonsGroup = document.createElement('div')
   reasonsGroup.className = 'ui-form-group'
   form.appendChild(reasonsGroup)
 
   const reasonsLabel = document.createElement('div')
-  reasonsLabel.textContent = 'Gründe'
-  reasonsLabel.className = 'ui-form-section'
+  reasonsLabel.className = 'ui-form-question ui-form-section'
+  reasonsLabel.textContent = 'Was trägt zu deinem (Un-)Wohlbefinden bei?'
   reasonsGroup.appendChild(reasonsLabel)
 
   const reasonsWrap = document.createElement('div')
@@ -664,7 +693,8 @@ function createPinUi() {
   noteGroup.className = 'ui-form-group'
   form.appendChild(noteGroup)
 
-  const noteLabel = document.createElement('label')
+  const noteLabel = document.createElement('div')
+  noteLabel.className = 'ui-form-question'
   noteLabel.textContent = 'Anmerkung'
   noteGroup.appendChild(noteLabel)
 
@@ -676,10 +706,16 @@ function createPinUi() {
   const viewPanel = document.createElement('div')
   viewPanel.className = 'ui-pin-view is-hidden'
   viewPanel.innerHTML = `
-    <div><strong>Status</strong>: <span class="ui-pin-view-status">—</span></div>
-    <div><strong>Wohlbefinden</strong>: <span class="ui-pin-view-score">—</span></div>
-    <div><strong>Gründe</strong>: <span class="ui-pin-view-reasons">—</span></div>
-    <div><strong>Notiz</strong>: <span class="ui-pin-view-note">—</span></div>
+    <div class="ui-pin-view-score-row">
+      <span>Wohlbefinden: <span class="ui-pin-view-score">—</span></span>
+      <div class="ui-pin-view-bar"><span class="ui-pin-view-bar-fill"></span></div>
+    </div>
+    <div>Was trägt zu deinem (Un-)Wohlbefinden bei? <span class="ui-pin-view-reasons">—</span></div>
+    <div>Anmerkung: <span class="ui-pin-view-note">—</span></div>
+    <div class="ui-pin-view-meta">
+      <span class="ui-pin-view-timestamp">—</span>
+      <span class="ui-pin-view-pending">Dieser Pin wartet auf Freigabe und ist für andere noch nicht sichtbar.</span>
+    </div>
   `
   form.appendChild(viewPanel)
 
@@ -704,12 +740,12 @@ function createPinUi() {
     submitButton,
     colorModeButtons: [modeWellbeing, modeReasons],
     legend,
-    previewDot: preview.querySelector('.ui-preview-dot'),
     viewPanel,
     viewWellbeing: viewPanel.querySelector('.ui-pin-view-score'),
     viewReasons: viewPanel.querySelector('.ui-pin-view-reasons'),
     viewNote: viewPanel.querySelector('.ui-pin-view-note'),
-    viewStatus: viewPanel.querySelector('.ui-pin-view-status'),
+    viewTimestamp: viewPanel.querySelector('.ui-pin-view-timestamp'),
+    viewScoreFill: viewPanel.querySelector('.ui-pin-view-bar-fill'),
     formGroups: [wellbeingGroup, reasonsGroup, noteGroup],
   }
 }
