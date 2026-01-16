@@ -42,6 +42,9 @@ BUILDINGS.forEach((building, buildingIndex) => {
   scene.add(buildingGroup)
 })
 
+let selectedFloor = 0
+let currentTargetY = getTargetYForFloor(selectedFloor)
+
 const { floorButtons, ui } = createFloorSelector(maxBasements, maxAboveGroundFloors)
 app.appendChild(ui)
 const pinSystem = createPinSystem({
@@ -52,9 +55,6 @@ const pinSystem = createPinSystem({
   getSelectedFloor: () => selectedFloor,
 })
 app.appendChild(pinSystem.ui)
-
-let selectedFloor = 0
-let currentTargetY = getTargetYForFloor(selectedFloor)
 
 floorButtons.forEach((button) => {
   button.addEventListener('click', () => setSelectedFloor(Number(button.dataset.index)))
