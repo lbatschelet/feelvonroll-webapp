@@ -127,6 +127,7 @@ function handleResize() {
 function animate() {
   requestAnimationFrame(animate)
   controls.update()
+  pinSystem.update()
   const deltaY = currentTargetY - controls.target.y
   if (Math.abs(deltaY) > 1e-6) {
     controls.target.y += deltaY
