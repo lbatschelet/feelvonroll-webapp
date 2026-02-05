@@ -233,7 +233,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         input.min = question.config?.min ?? 1
         input.max = question.config?.max ?? 10
         input.step = question.config?.step ?? 1
-        input.value = question.config?.default ?? 6
+        input.value = question.config?.default ?? 5
         group.appendChild(input)
 
         const legend = document.createElement('div')
@@ -834,8 +834,8 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
   function getWellbeingValue() {
     const elements = state.questionElements.get('wellbeing')
-    if (!elements?.input) return 6
-    return Number(elements.input.value || 6)
+    if (!elements?.input) return 5
+    return Number(elements.input.value || 5)
   }
 
   function bySort(a, b) {

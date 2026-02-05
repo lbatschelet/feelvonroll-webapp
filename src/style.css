@@ -54,6 +54,7 @@ canvas {
   top: 16px;
   right: 16px;
   display: inline-flex;
+  flex-direction: column;
   gap: 6px;
   padding: 6px;
   background: rgba(255, 255, 255, 0.92);
@@ -62,10 +63,25 @@ canvas {
   backdrop-filter: blur(6px);
 }
 
+.ui-language-current,
 .ui-language-button {
   padding: 4px 10px;
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.ui-language-current {
+  min-width: 48px;
+}
+
+.ui-language-list {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-language.is-open .ui-language-list {
+  display: flex;
 }
 
 .ui-floor-list {

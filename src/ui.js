@@ -28,24 +28,39 @@ export function createLanguageSwitcher({ languages, activeLanguage, ariaLabel, o
     ui.setAttribute('aria-label', ariaLabel)
   }
 
+  const currentButton = document.createElement('button')
+  currentButton.type = 'button'
+  currentButton.className = 'ui-language-current'
+  ui.appendChild(currentButton)
+
+  const list = document.createElement('div')
+  list.className = 'ui-language-list'
+  ui.appendChild(list)
+
   const buttons = new Map()
+  let currentLanguage = activeLanguage
 
   function renderLanguages(nextLanguages) {
-    ui.querySelectorAll('.ui-language-button').forEach((button) => button.remove())
+    list.innerHTML = ''
     buttons.clear()
     nextLanguages.forEach((language) => {
       const button = document.createElement('button')
       button.type = 'button'
       button.className = 'ui-language-button'
-      button.textContent = language.label
+      button.textContent = `${language.label} (${String(language.id).toUpperCase()})`
       button.dataset.lang = language.id
-      button.addEventListener('click', () => onChange(language.id))
-      ui.appendChild(button)
+      button.addEventListener('click', () => {
+        onChange(language.id)
+        setOpen(false)
+      })
+      list.appendChild(button)
       buttons.set(language.id, button)
     })
   }
 
   function setActiveLanguage(language) {
+    currentLanguage = language
+    currentButton.textContent = String(language || '').toUpperCase()
     buttons.forEach((button, lang) => {
       button.classList.toggle('active', lang === language)
     })
@@ -55,6 +70,21 @@ export function createLanguageSwitcher({ languages, activeLanguage, ariaLabel, o
     if (!label) return
     ui.setAttribute('aria-label', label)
   }
+
+  function setOpen(open) {
+    ui.classList.toggle('is-open', open)
+  }
+
+  currentButton.addEventListener('click', (event) => {
+    event.stopPropagation()
+    setOpen(!ui.classList.contains('is-open'))
+  })
+
+  document.addEventListener('click', (event) => {
+    if (!ui.contains(event.target)) {
+      setOpen(false)
+    }
+  })
 
   renderLanguages(languages)
   setActiveLanguage(activeLanguage)

@@ -7,7 +7,7 @@ export function getFallbackQuestions() {
       type: 'slider',
       required: true,
       sort: 10,
-      config: { min: 1, max: 10, step: 1, default: 6 },
+      config: { min: 1, max: 10, step: 1, default: 5 },
       label: t('questions.wellbeing.label'),
       legend_low: t('questions.wellbeing.legend_low'),
       legend_high: t('questions.wellbeing.legend_high'),
