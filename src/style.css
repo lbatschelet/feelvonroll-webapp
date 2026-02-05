@@ -50,6 +50,24 @@ canvas {
   backdrop-filter: blur(6px);
 }
 
+.ui-language {
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(6px);
+}
+
+.ui-language-button {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .ui-floor-list {
   display: flex;
   flex-direction: column-reverse;
@@ -211,6 +229,10 @@ canvas {
   display: block;
 }
 
+.ui-form-content.is-hidden {
+  display: none;
+}
+
 .ui-form-group.is-hidden {
   display: none;
 }
@@ -356,5 +378,10 @@ button:focus-visible {
   .ui-pin-panel {
     left: 12px;
     bottom: 12px;
+  }
+
+  .ui-language {
+    top: 12px;
+    right: 12px;
   }
 }

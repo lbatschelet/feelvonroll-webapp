@@ -1,6 +1,6 @@
 # feelvonroll-webapp
 
-## Installieren & Starten
+## Install & Run
 
 ```bash
 npm install
@@ -13,20 +13,26 @@ npm run dev
 npm run build
 ```
 
+## Tests
+
+```bash
+npm test
+```
+
 ## API
 
-- Standard: erwartet API unter `/api`
-- Custom: setze `VITE_API_BASE` beim Build, z. B.:
+- Default expects the API at `/api`
+- Custom: set `VITE_API_BASE` at build time, e.g.
   - `VITE_API_BASE=https://your-domain.tld/api npm run build`
 
-## Floors-Implementierung
+## Floors Implementation
 
-- Jede Etage ist ein eigener `THREE.Group` in `floorGroups`.
-- Die Gruppen enthalten eine Bodenplatte und Wände.
+- Each floor is a dedicated `THREE.Group` in `floorGroups`.
+- The groups contain a slab and walls.
 
-## Nächste Schritte (glTF)
+## Next Steps (glTF)
 
-- Ersetze die Box-Geometrien in `createFloor()` durch ein geladenes glTF.
-- Verwende `GLTFLoader` aus `three/examples/jsm/loaders/GLTFLoader.js`.
-- Lege die geladenen Meshes in die jeweiligen `THREE.Group`-Einträge.
-- Optional: pro Etage eine separate glTF oder eine glTF mit benannten Nodes.
+- Replace the box geometries in `createFloor()` with loaded glTF.
+- Use `GLTFLoader` from `three/examples/jsm/loaders/GLTFLoader.js`.
+- Attach loaded meshes to the respective `THREE.Group` entries.
+- Optional: one glTF per floor, or a single glTF with named nodes.

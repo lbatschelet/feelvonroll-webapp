@@ -10,10 +10,15 @@ import {
   createScene,
 } from './scene'
 import { createFloorGroup, setFloorWallMode } from './floors'
-import { createFloorSelector } from './ui'
+import { createFloorSelector, createLanguageSwitcher } from './ui'
 import { createPinSystem } from './pins'
+import { fetchLanguages, fetchQuestions } from './api'
+import { getFallbackQuestions } from './questionnaire'
+import { getLanguage, onLanguageChange, setLanguage, t } from './i18n'
 
 const app = document.querySelector('#app')
+
+setLanguage(getLanguage())
 
 const renderer = createRenderer(app)
 const scene = createScene()
@@ -47,12 +52,20 @@ let currentTargetY = getTargetYForFloor(selectedFloor)
 
 const { floorButtons, ui } = createFloorSelector(maxBasements, maxAboveGroundFloors)
 app.appendChild(ui)
+const languageSwitcher = createLanguageSwitcher({
+  languages: [],
+  activeLanguage: getLanguage(),
+  ariaLabel: t('ui.language'),
+  onChange: (language) => setLanguage(language),
+})
+app.appendChild(languageSwitcher.ui)
 const pinSystem = createPinSystem({
   scene,
   camera,
   domElement: renderer.domElement,
   controls,
   getSelectedFloor: () => selectedFloor,
+  questions: [],
 })
 app.appendChild(pinSystem.ui)
 
@@ -63,6 +76,47 @@ floorButtons.forEach((button) => {
 setSelectedFloor(selectedFloor)
 window.addEventListener('resize', handleResize)
 animate()
+
+onLanguageChange((language) => {
+  languageSwitcher.setActiveLanguage(language)
+  languageSwitcher.setAriaLabel(t('ui.language'))
+  loadQuestions(language)
+})
+
+loadLanguages()
+loadQuestions(getLanguage())
+
+async function loadLanguages() {
+  try {
+    const languages = await fetchLanguages()
+    if (languages.length) {
+      languageSwitcher.setLanguages(languages.map((item) => ({ id: item.lang, label: item.label })))
+      if (!languages.some((item) => item.lang === getLanguage())) {
+        setLanguage(languages[0].lang)
+      }
+      return
+    }
+  } catch (error) {
+    // ignore and fall back to defaults
+  }
+  languageSwitcher.setLanguages([
+    { id: 'de', label: 'DE' },
+    { id: 'en', label: 'EN' },
+  ])
+}
+
+async function loadQuestions(language) {
+  try {
+    const questions = await fetchQuestions({ lang: language })
+    if (Array.isArray(questions) && questions.length) {
+      pinSystem.setQuestions(questions)
+      return
+    }
+  } catch (error) {
+    // ignore and fall back to defaults
+  }
+  pinSystem.setQuestions(getFallbackQuestions())
+}
 
 function getTargetYForFloor(floorIndex) {
   return (

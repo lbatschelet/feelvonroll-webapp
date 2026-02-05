@@ -19,3 +19,45 @@ export function createFloorSelector(maxBasements, maxAboveGroundFloors) {
 
   return { floorButtons, ui }
 }
+
+export function createLanguageSwitcher({ languages, activeLanguage, ariaLabel, onChange }) {
+  const ui = document.createElement('div')
+  ui.className = 'ui ui-language'
+  ui.setAttribute('role', 'group')
+  if (ariaLabel) {
+    ui.setAttribute('aria-label', ariaLabel)
+  }
+
+  const buttons = new Map()
+
+  function renderLanguages(nextLanguages) {
+    ui.querySelectorAll('.ui-language-button').forEach((button) => button.remove())
+    buttons.clear()
+    nextLanguages.forEach((language) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'ui-language-button'
+      button.textContent = language.label
+      button.dataset.lang = language.id
+      button.addEventListener('click', () => onChange(language.id))
+      ui.appendChild(button)
+      buttons.set(language.id, button)
+    })
+  }
+
+  function setActiveLanguage(language) {
+    buttons.forEach((button, lang) => {
+      button.classList.toggle('active', lang === language)
+    })
+  }
+
+  function setAriaLabel(label) {
+    if (!label) return
+    ui.setAttribute('aria-label', label)
+  }
+
+  renderLanguages(languages)
+  setActiveLanguage(activeLanguage)
+
+  return { ui, setActiveLanguage, setAriaLabel, setLanguages: renderLanguages }
+}

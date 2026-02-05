@@ -1,19 +1,20 @@
 import * as THREE from 'three'
 import { createPin, fetchPins } from './api'
 import { getFloorSlabTopY } from './floors'
+import { getLocale, onLanguageChange, t } from './i18n'
 
-const REASONS = [
-  { key: 'licht', label: 'Licht' },
-  { key: 'ruhe', label: 'Ruhe' },
-  { key: 'laerm', label: 'Lärm' },
-  { key: 'aussicht', label: 'Aussicht' },
-  { key: 'sicherheit', label: 'Sicherheit' },
-  { key: 'sauberkeit', label: 'Sauberkeit' },
-  { key: 'layout', label: 'Layout' },
-  { key: 'temperatur', label: 'Temperatur' },
-]
+const REASON_COLORS = {
+  licht: 0xf59e0b,
+  ruhe: 0x38bdf8,
+  laerm: 0xef4444,
+  aussicht: 0x60a5fa,
+  sicherheit: 0x22c55e,
+  sauberkeit: 0xa3e635,
+  layout: 0x8b5cf6,
+  temperatur: 0xf97316,
+}
 
-export function createPinSystem({ scene, camera, domElement, controls, getSelectedFloor }) {
+export function createPinSystem({ scene, camera, domElement, controls, getSelectedFloor, questions }) {
   const state = {
     pins: [],
     localPins: [],
@@ -22,6 +23,10 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     pendingMesh: null,
     colorMode: 'wellbeing',
     lastClusterDistance: null,
+    viewPin: null,
+    questions: [],
+    questionElements: new Map(),
+    optionsByQuestion: new Map(),
   }
 
   const pinGroup = new THREE.Group()
@@ -38,25 +43,56 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     toggleButton,
     backdrop,
     form,
+    formContent,
     closeButton,
     submitButton,
     colorModeButtons,
     legend,
     viewPanel,
     viewWellbeing,
+    viewWellbeingLabel,
     viewReasons,
+    viewReasonsLabel,
+    viewGroup,
+    viewGroupLabel,
+    viewGroupRow,
     viewNote,
+    viewNoteLabel,
+    viewPending,
     viewTimestamp,
     viewScoreFill,
-    formGroups,
   } = ui
+
+  applyStaticTranslations()
+  onLanguageChange(() => {
+    applyStaticTranslations()
+    updateLegend()
+    refreshViewTexts()
+  })
+
+  setQuestions(Array.isArray(questions) ? questions : [])
 
   toggleButton.addEventListener('click', () => {
     state.pinMode = !state.pinMode
     toggleButton.classList.toggle('active', state.pinMode)
-    toggleButton.textContent = state.pinMode ? 'Pin platzieren' : '+ Pin'
+    toggleButton.textContent = state.pinMode ? t('ui.pinToggleActive') : t('ui.pinToggleIdle')
     controls.enabled = !state.pinMode
     document.body.classList.toggle('pin-mode', state.pinMode)
+  })
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return
+    if (backdrop.classList.contains('is-visible')) {
+      closeForm()
+      return
+    }
+    if (state.pinMode) {
+      state.pinMode = false
+      toggleButton.classList.remove('active')
+      toggleButton.textContent = t('ui.pinToggleIdle')
+      controls.enabled = true
+      document.body.classList.remove('pin-mode')
+    }
   })
 
   colorModeButtons.forEach((button) => {
@@ -122,7 +158,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       controls.enabled = true
       document.body.classList.remove('pin-mode')
     } catch (error) {
-      showFormError('Speichern fehlgeschlagen')
+      showFormError(error?.message || t('error.saveFailed'))
     }
   })
 
@@ -148,6 +184,107 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         renderPins()
       }
     },
+    setQuestions,
+  }
+
+  function setQuestions(nextQuestions) {
+    state.questions = Array.isArray(nextQuestions) ? [...nextQuestions].sort(bySort) : []
+    state.questionElements = new Map()
+    state.optionsByQuestion = new Map()
+    state.questions.forEach((question) => {
+      if (Array.isArray(question.options)) {
+        state.optionsByQuestion.set(question.key, question.options)
+      }
+    })
+    const hasReasons = (state.optionsByQuestion.get('reasons') || []).length > 0
+    const hasGroup = state.questions.some((question) => question.key === 'group')
+    colorModeButtons[1].style.display = hasReasons ? '' : 'none'
+    viewGroupRow.style.display = hasGroup ? '' : 'none'
+    if (!hasReasons && state.colorMode === 'reasons') {
+      state.colorMode = 'wellbeing'
+      colorModeButtons[0].classList.add('active')
+      colorModeButtons[1].classList.remove('active')
+    }
+    renderQuestions()
+    applyQuestionLabels()
+    updateLegend()
+  }
+
+  function renderQuestions() {
+    formContent.innerHTML = ''
+    state.questionElements.clear()
+
+    state.questions.forEach((question) => {
+      const group = document.createElement('div')
+      group.className = 'ui-form-group'
+      group.dataset.questionKey = question.key
+
+      const label = document.createElement('div')
+      label.className = 'ui-form-question'
+      label.textContent = question.label || question.key
+      group.appendChild(label)
+
+      let elements = { group, label, type: question.type, inputs: [] }
+
+      if (question.type === 'slider') {
+        const input = document.createElement('input')
+        input.type = 'range'
+        input.name = question.key
+        input.min = question.config?.min ?? 1
+        input.max = question.config?.max ?? 10
+        input.step = question.config?.step ?? 1
+        input.value = question.config?.default ?? 6
+        group.appendChild(input)
+
+        const legend = document.createElement('div')
+        legend.className = 'ui-slider-legend'
+        const legendLow = document.createElement('span')
+        legendLow.className = 'ui-slider-legend-low'
+        legendLow.textContent = question.legend_low || ''
+        const legendHigh = document.createElement('span')
+        legendHigh.className = 'ui-slider-legend-high'
+        legendHigh.textContent = question.legend_high || ''
+        legend.appendChild(legendLow)
+        legend.appendChild(legendHigh)
+        group.appendChild(legend)
+
+        elements = { ...elements, input, legendLow, legendHigh }
+      }
+
+      if (question.type === 'multi') {
+        const wrapper = document.createElement('div')
+        wrapper.className = 'ui-form-reasons'
+        const allowMultiple = Boolean(question.config?.allow_multiple)
+        const inputType = allowMultiple ? 'checkbox' : 'radio'
+        const options = Array.isArray(question.options) ? question.options : []
+        options.forEach((option) => {
+          const optionLabel = document.createElement('label')
+          optionLabel.className = 'ui-checkbox'
+          const input = document.createElement('input')
+          input.type = inputType
+          input.name = question.key
+          input.value = option.key
+          const text = document.createElement('span')
+          text.textContent = option.label || option.key
+          optionLabel.appendChild(input)
+          optionLabel.appendChild(text)
+          wrapper.appendChild(optionLabel)
+          elements.inputs.push({ input, label: text, key: option.key })
+        })
+        group.appendChild(wrapper)
+      }
+
+      if (question.type === 'text') {
+        const input = document.createElement('textarea')
+        input.name = question.key
+        input.rows = question.config?.rows ?? 3
+        group.appendChild(input)
+        elements = { ...elements, input }
+      }
+
+      formContent.appendChild(group)
+      state.questionElements.set(question.key, elements)
+    })
   }
 
   async function loadPins() {
@@ -223,40 +360,34 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     form.reset()
     clearFormError()
     form.dataset.mode = pin ? 'view' : 'create'
+    state.viewPin = pin || null
 
-    const fields = form.elements
     if (pin) {
-      fields.wellbeing.value = pin.wellbeing
-      fields.note.value = pin.note || ''
       const reasons = safeParseReasons(pin.reasons)
-      Array.from(fields.reasons).forEach((checkbox) => {
-        checkbox.checked = reasons.includes(checkbox.value)
-      })
-      fields.wellbeing.disabled = true
-      fields.note.disabled = true
-      Array.from(fields.reasons).forEach((checkbox) => {
-        checkbox.disabled = true
-      })
+      const group = pin.group_key || ''
+      setQuestionValue('wellbeing', pin.wellbeing)
+      setQuestionValue('note', pin.note || '')
+      setQuestionValue('reasons', reasons)
+      setQuestionValue('group', group ? [group] : [])
+      disableQuestions(true)
       submitButton.disabled = true
       submitButton.classList.add('is-hidden')
-      formGroups.forEach((group) => group.classList.add('is-hidden'))
+      formContent.classList.add('is-hidden')
       viewPanel.classList.remove('is-hidden')
       viewWellbeing.textContent = `${pin.wellbeing}/10`
       viewScoreFill.style.width = `${Math.min(Math.max((pin.wellbeing / 10) * 100, 0), 100)}%`
-      viewReasons.textContent = reasons.length ? reasons.join(', ') : '—'
-      viewNote.textContent = pin.note?.trim() ? pin.note : '—'
+      viewReasons.textContent = reasons.length
+        ? reasons.map((key) => getOptionLabel('reasons', key)).join(', ')
+        : t('ui.empty')
+      viewGroup.textContent = group ? getOptionLabel('group', group) : t('ui.empty')
+      viewNote.textContent = pin.note?.trim() ? pin.note : t('ui.empty')
       viewTimestamp.textContent = formatTimestamp(pin.created_at)
       viewTimestamp.dataset.pending = isLocalPin(pin.id) && pin.approved === 0 ? 'true' : 'false'
     } else {
-      fields.wellbeing.disabled = false
-      fields.note.disabled = false
-      Array.from(fields.reasons).forEach((checkbox) => {
-        checkbox.disabled = false
-        checkbox.checked = false
-      })
+      disableQuestions(false)
       submitButton.disabled = false
       submitButton.classList.remove('is-hidden')
-      formGroups.forEach((group) => group.classList.remove('is-hidden'))
+      formContent.classList.remove('is-hidden')
       viewPanel.classList.add('is-hidden')
       form.dataset.floorIndex = floorIndex
       form.dataset.x = position.x
@@ -274,9 +405,15 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     form.dataset.x = ''
     form.dataset.y = ''
     form.dataset.z = ''
+    state.viewPin = null
     if (form.dataset.mode === 'create') {
       removePendingPin()
     }
+    state.pinMode = false
+    toggleButton.classList.remove('active')
+    toggleButton.textContent = t('ui.pinToggleIdle')
+    controls.enabled = true
+    document.body.classList.remove('pin-mode')
   }
 
   function collectFormData() {
@@ -284,15 +421,34 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     const x = Number(form.dataset.x)
     const y = Number(form.dataset.y)
     const z = Number(form.dataset.z)
-    const wellbeing = Number(form.elements.wellbeing.value)
-    const note = form.elements.note.value.trim()
-    const reasons = Array.from(form.elements.reasons)
-      .filter((checkbox) => checkbox.checked)
-      .map((checkbox) => checkbox.value)
 
     if (Number.isNaN(floorIndex) || Number.isNaN(x)) {
-      showFormError('Kein Standort gewählt')
+      showFormError(t('error.noLocation'))
       return null
+    }
+
+    const answers = {}
+    for (const question of state.questions) {
+      const elements = state.questionElements.get(question.key)
+      if (!elements) continue
+      if (question.type === 'slider') {
+        answers[question.key] = Number(elements.input.value)
+      }
+      if (question.type === 'text') {
+        answers[question.key] = elements.input.value.trim()
+      }
+      if (question.type === 'multi') {
+        const allowMultiple = Boolean(question.config?.allow_multiple)
+        const selected = elements.inputs
+          .filter((item) => item.input.checked)
+          .map((item) => item.input.value)
+        answers[question.key] = allowMultiple ? selected : selected[0] || ''
+      }
+
+      if (question.required && isAnswerEmpty(answers[question.key])) {
+        showFormError(t('error.required'))
+        return null
+      }
     }
 
     return {
@@ -300,10 +456,15 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       x,
       y,
       z,
-      wellbeing,
-      reasons,
-      note,
+      answers,
     }
+  }
+
+  function isAnswerEmpty(value) {
+    if (Array.isArray(value)) return value.length === 0
+    if (value === null || value === undefined) return true
+    if (typeof value === 'string') return value.trim().length === 0
+    return false
   }
 
   function safeParseReasons(value) {
@@ -337,10 +498,11 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       position_x: position.x,
       position_y: position.y,
       position_z: position.z,
-      wellbeing: Number(form?.elements?.wellbeing?.value || 6),
+      wellbeing: getWellbeingValue(),
       reasons: [],
       note: '',
       approved: 0,
+      group_key: null,
     }
     const mesh = createPinMesh(draft)
     mesh.position.set(position.x, position.y + 0.2, position.z)
@@ -377,6 +539,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       wellbeing: Number(pin.wellbeing),
       approved: Number(pin.approved),
       reasons: Array.isArray(pin.reasons) ? pin.reasons : safeParseReasons(pin.reasons),
+      group_key: pin.group_key || null,
     }
   }
 
@@ -424,18 +587,8 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   }
 
   function getReasonColor(reasons) {
-    const colors = {
-      licht: 0xf59e0b,
-      ruhe: 0x38bdf8,
-      laerm: 0xef4444,
-      aussicht: 0x60a5fa,
-      sicherheit: 0x22c55e,
-      sauberkeit: 0xa3e635,
-      layout: 0x8b5cf6,
-      temperatur: 0xf97316,
-    }
     if (!reasons || !reasons.length) return new THREE.Color(0x9ca3af)
-    const palette = reasons.map((key) => new THREE.Color(colors[key] || 0x9ca3af))
+    const palette = reasons.map((key) => new THREE.Color(REASON_COLORS[key] || 0x9ca3af))
     const mixed = palette.reduce((acc, color) => acc.add(color), new THREE.Color(0, 0, 0))
     mixed.multiplyScalar(1 / palette.length)
     return mixed
@@ -450,14 +603,17 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         'linear-gradient(90deg, #440154, #482475, #414487, #355f8d, #2a788e, #21908d, #22a884, #42be71, #7ad151, #bddf26)'
       const labels = document.createElement('div')
       labels.className = 'ui-legend-labels'
-      labels.innerHTML = '<span>Gar nicht wohl</span><span>Sehr wohl</span>'
+      labels.innerHTML = `<span>${t('legend.wellbeingLow')}</span><span>${t(
+        'legend.wellbeingHigh'
+      )}</span>`
       legend.appendChild(gradient)
       legend.appendChild(labels)
       return
     }
 
-    REASONS.forEach((reason) => {
-      legend.appendChild(createLegendItem(reason.label, getReasonColor([reason.key])))
+    const reasons = state.optionsByQuestion.get('reasons') || []
+    reasons.forEach((reason) => {
+      legend.appendChild(createLegendItem(reason.label || reason.key, getReasonColor([reason.key])))
     })
   }
 
@@ -476,12 +632,15 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
   function getColorFromForm() {
     if (state.colorMode === 'reasons') {
-      const checked = Array.from(form.elements.reasons || [])
-        .filter((checkbox) => checkbox.checked)
-        .map((checkbox) => checkbox.value)
+      const elements = state.questionElements.get('reasons')
+      if (!elements) return getReasonColor([])
+      const checked = elements.inputs
+        .filter((item) => item.input.checked)
+        .map((item) => item.input.value)
       return getReasonColor(checked)
     }
-    return getWellbeingColor(form.elements.wellbeing?.value)
+    const elements = state.questionElements.get('wellbeing')
+    return getWellbeingColor(elements?.input?.value)
   }
 
   function updatePreviewColor() {
@@ -490,10 +649,10 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   }
 
   function formatTimestamp(value) {
-    if (!value) return '—'
+    if (!value) return t('ui.empty')
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleString('de-CH')
+    return date.toLocaleString(getLocale())
   }
 
   function isLocalPin(id) {
@@ -581,6 +740,107 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     clusterTextureCache.set(count, texture)
     return texture
   }
+
+  function applyStaticTranslations() {
+    toggleButton.textContent = state.pinMode ? t('ui.pinToggleActive') : t('ui.pinToggleIdle')
+    colorModeButtons[0].textContent = t('ui.modeWellbeing')
+    colorModeButtons[1].textContent = t('ui.modeReasons')
+    closeButton.setAttribute('aria-label', t('ui.close'))
+    submitButton.textContent = t('ui.save')
+    viewWellbeingLabel.textContent = t('ui.viewWellbeing')
+    viewReasonsLabel.textContent = t('ui.viewReasons')
+    viewGroupLabel.textContent = t('questions.group.label')
+    viewNoteLabel.textContent = t('ui.viewNote')
+    viewPending.textContent = t('ui.viewPending')
+  }
+
+  function applyQuestionLabels() {
+    state.questions.forEach((question) => {
+      const elements = state.questionElements.get(question.key)
+      if (!elements) return
+      elements.label.textContent = question.label || question.key
+      if (question.type === 'slider') {
+        elements.legendLow.textContent = question.legend_low || ''
+        elements.legendHigh.textContent = question.legend_high || ''
+      }
+      if (question.type === 'multi') {
+        elements.inputs.forEach((item) => {
+          const optionLabel = getOptionLabel(question.key, item.key)
+          item.label.textContent = optionLabel
+        })
+      }
+
+      if (question.key === 'wellbeing') {
+        viewWellbeingLabel.textContent = question.label || t('ui.viewWellbeing')
+      }
+      if (question.key === 'reasons') {
+        viewReasonsLabel.textContent = question.label || t('ui.viewReasons')
+      }
+      if (question.key === 'group') {
+        viewGroupLabel.textContent = question.label || t('questions.group.label')
+      }
+      if (question.key === 'note') {
+        viewNoteLabel.textContent = question.label || t('ui.viewNote')
+      }
+    })
+  }
+
+  function refreshViewTexts() {
+    if (!state.viewPin) return
+    const reasons = safeParseReasons(state.viewPin.reasons)
+    const group = state.viewPin.group_key || ''
+    viewReasons.textContent = reasons.length
+      ? reasons.map((key) => getOptionLabel('reasons', key)).join(', ')
+      : t('ui.empty')
+    viewGroup.textContent = group ? getOptionLabel('group', group) : t('ui.empty')
+    viewNote.textContent = state.viewPin.note?.trim() ? state.viewPin.note : t('ui.empty')
+    viewTimestamp.textContent = formatTimestamp(state.viewPin.created_at)
+  }
+
+  function getOptionLabel(questionKey, optionKey) {
+    const options = state.optionsByQuestion.get(questionKey) || []
+    const match = options.find((option) => option.key === optionKey)
+    return match?.label || optionKey
+  }
+
+  function disableQuestions(disabled) {
+    state.questionElements.forEach((elements) => {
+      if (elements.input) {
+        elements.input.disabled = disabled
+      }
+      elements.inputs?.forEach((item) => {
+        item.input.disabled = disabled
+      })
+    })
+  }
+
+  function setQuestionValue(key, value) {
+    const elements = state.questionElements.get(key)
+    if (!elements) return
+    if (elements.input) {
+      elements.input.value = value ?? ''
+      return
+    }
+    if (Array.isArray(value)) {
+      elements.inputs.forEach((item) => {
+        item.input.checked = value.includes(item.input.value)
+      })
+    } else {
+      elements.inputs.forEach((item) => {
+        item.input.checked = item.input.value === value
+      })
+    }
+  }
+
+  function getWellbeingValue() {
+    const elements = state.questionElements.get('wellbeing')
+    if (!elements?.input) return 6
+    return Number(elements.input.value || 6)
+  }
+
+  function bySort(a, b) {
+    return (a.sort ?? 0) - (b.sort ?? 0)
+  }
 }
 
 function createPinUi() {
@@ -590,7 +850,7 @@ function createPinUi() {
   const toggleButton = document.createElement('button')
   toggleButton.type = 'button'
   toggleButton.className = 'ui-pin-toggle'
-  toggleButton.textContent = '+ Pin'
+  toggleButton.textContent = t('ui.pinToggleIdle')
   panel.appendChild(toggleButton)
 
   const modeRow = document.createElement('div')
@@ -600,14 +860,14 @@ function createPinUi() {
   const modeWellbeing = document.createElement('button')
   modeWellbeing.type = 'button'
   modeWellbeing.className = 'ui-pin-mode-button active'
-  modeWellbeing.textContent = 'Wohlbefinden'
+  modeWellbeing.textContent = t('ui.modeWellbeing')
   modeWellbeing.dataset.mode = 'wellbeing'
   modeRow.appendChild(modeWellbeing)
 
   const modeReasons = document.createElement('button')
   modeReasons.type = 'button'
   modeReasons.className = 'ui-pin-mode-button'
-  modeReasons.textContent = 'Gründe'
+  modeReasons.textContent = t('ui.modeReasons')
   modeReasons.dataset.mode = 'reasons'
   modeRow.appendChild(modeReasons)
 
@@ -625,7 +885,7 @@ function createPinUi() {
   const closeButton = document.createElement('button')
   closeButton.type = 'button'
   closeButton.className = 'ui-modal-close'
-  closeButton.setAttribute('aria-label', 'Schliessen')
+  closeButton.setAttribute('aria-label', t('ui.close'))
   closeButton.innerHTML = `
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M6 6l12 12M18 6l-12 12" />
@@ -637,84 +897,35 @@ function createPinUi() {
   form.className = 'ui-form'
   modal.appendChild(form)
 
-  const wellbeingGroup = document.createElement('div')
-  wellbeingGroup.className = 'ui-form-group'
-  form.appendChild(wellbeingGroup)
-
-  const wellbeingLabel = document.createElement('div')
-  wellbeingLabel.className = 'ui-form-question'
-  wellbeingLabel.textContent = 'Wie fühlst du dich hier?'
-  wellbeingGroup.appendChild(wellbeingLabel)
-
-  const wellbeingInput = document.createElement('input')
-  wellbeingInput.type = 'range'
-  wellbeingInput.name = 'wellbeing'
-  wellbeingInput.min = '1'
-  wellbeingInput.max = '10'
-  wellbeingInput.value = '6'
-  wellbeingGroup.appendChild(wellbeingInput)
-
-  const wellbeingLegend = document.createElement('div')
-  wellbeingLegend.className = 'ui-slider-legend'
-  wellbeingLegend.innerHTML = `
-    <span>Gar nicht wohl</span>
-    <span>Sehr wohl</span>
-  `
-  wellbeingGroup.appendChild(wellbeingLegend)
-
-  const reasonsGroup = document.createElement('div')
-  reasonsGroup.className = 'ui-form-group'
-  form.appendChild(reasonsGroup)
-
-  const reasonsLabel = document.createElement('div')
-  reasonsLabel.className = 'ui-form-question ui-form-section'
-  reasonsLabel.textContent = 'Was trägt zu deinem (Un-)Wohlbefinden bei?'
-  reasonsGroup.appendChild(reasonsLabel)
-
-  const reasonsWrap = document.createElement('div')
-  reasonsWrap.className = 'ui-form-reasons'
-  reasonsGroup.appendChild(reasonsWrap)
-
-  REASONS.forEach((reason) => {
-    const label = document.createElement('label')
-    label.className = 'ui-checkbox'
-    const input = document.createElement('input')
-    input.type = 'checkbox'
-    input.name = 'reasons'
-    input.value = reason.key
-    const text = document.createElement('span')
-    text.textContent = reason.label
-    label.appendChild(input)
-    label.appendChild(text)
-    reasonsWrap.appendChild(label)
-  })
-
-  const noteGroup = document.createElement('div')
-  noteGroup.className = 'ui-form-group'
-  form.appendChild(noteGroup)
-
-  const noteLabel = document.createElement('div')
-  noteLabel.className = 'ui-form-question'
-  noteLabel.textContent = 'Anmerkung'
-  noteGroup.appendChild(noteLabel)
-
-  const noteInput = document.createElement('textarea')
-  noteInput.name = 'note'
-  noteInput.rows = 3
-  noteGroup.appendChild(noteInput)
+  const formContent = document.createElement('div')
+  formContent.className = 'ui-form-content'
+  form.appendChild(formContent)
 
   const viewPanel = document.createElement('div')
   viewPanel.className = 'ui-pin-view is-hidden'
   viewPanel.innerHTML = `
     <div class="ui-pin-view-score-row">
-      <span>Wohlbefinden: <span class="ui-pin-view-score">—</span></span>
+      <span>
+        <span class="ui-pin-view-label wellbeing">${t('ui.viewWellbeing')}</span>
+        <span class="ui-pin-view-score">${t('ui.empty')}</span>
+      </span>
       <div class="ui-pin-view-bar"><span class="ui-pin-view-bar-fill"></span></div>
     </div>
-    <div>Was trägt zu deinem (Un-)Wohlbefinden bei? <span class="ui-pin-view-reasons">—</span></div>
-    <div>Anmerkung: <span class="ui-pin-view-note">—</span></div>
+    <div>
+      <span class="ui-pin-view-label reasons">${t('ui.viewReasons')}</span>
+      <span class="ui-pin-view-reasons">${t('ui.empty')}</span>
+    </div>
+    <div class="ui-pin-view-group-row">
+      <span class="ui-pin-view-label group">${t('questions.group.label')}</span>
+      <span class="ui-pin-view-group">${t('ui.empty')}</span>
+    </div>
+    <div>
+      <span class="ui-pin-view-label note">${t('ui.viewNote')}</span>
+      <span class="ui-pin-view-note">${t('ui.empty')}</span>
+    </div>
     <div class="ui-pin-view-meta">
-      <span class="ui-pin-view-timestamp">—</span>
-      <span class="ui-pin-view-pending">Dieser Pin wartet auf Freigabe und ist für andere noch nicht sichtbar.</span>
+      <span class="ui-pin-view-timestamp">${t('ui.empty')}</span>
+      <span class="ui-pin-view-pending">${t('ui.viewPending')}</span>
     </div>
   `
   form.appendChild(viewPanel)
@@ -726,7 +937,7 @@ function createPinUi() {
   const submitButton = document.createElement('button')
   submitButton.type = 'submit'
   submitButton.className = 'ui-form-submit'
-  submitButton.textContent = 'Speichern'
+  submitButton.textContent = t('ui.save')
   form.appendChild(submitButton)
 
   document.body.appendChild(backdrop)
@@ -736,16 +947,23 @@ function createPinUi() {
     toggleButton,
     backdrop,
     form,
+    formContent,
     closeButton,
     submitButton,
     colorModeButtons: [modeWellbeing, modeReasons],
     legend,
     viewPanel,
     viewWellbeing: viewPanel.querySelector('.ui-pin-view-score'),
+    viewWellbeingLabel: viewPanel.querySelector('.ui-pin-view-label.wellbeing'),
     viewReasons: viewPanel.querySelector('.ui-pin-view-reasons'),
+    viewReasonsLabel: viewPanel.querySelector('.ui-pin-view-label.reasons'),
+    viewGroup: viewPanel.querySelector('.ui-pin-view-group'),
+    viewGroupLabel: viewPanel.querySelector('.ui-pin-view-label.group'),
+    viewGroupRow: viewPanel.querySelector('.ui-pin-view-group-row'),
     viewNote: viewPanel.querySelector('.ui-pin-view-note'),
+    viewNoteLabel: viewPanel.querySelector('.ui-pin-view-label.note'),
+    viewPending: viewPanel.querySelector('.ui-pin-view-pending'),
     viewTimestamp: viewPanel.querySelector('.ui-pin-view-timestamp'),
     viewScoreFill: viewPanel.querySelector('.ui-pin-view-bar-fill'),
-    formGroups: [wellbeingGroup, reasonsGroup, noteGroup],
   }
 }
