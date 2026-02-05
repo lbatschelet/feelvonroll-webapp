@@ -3,16 +3,19 @@ import { createPin, fetchPins } from './api'
 import { getFloorSlabTopY } from './floors'
 import { getLocale, onLanguageChange, t } from './i18n'
 
-const REASON_COLORS = {
-  licht: 0xf59e0b,
-  ruhe: 0x38bdf8,
-  laerm: 0xef4444,
-  aussicht: 0x60a5fa,
-  sicherheit: 0x22c55e,
-  sauberkeit: 0xa3e635,
-  layout: 0x8b5cf6,
-  temperatur: 0xf97316,
-}
+const SLIDER_PALETTE = [
+  '#440154',
+  '#482475',
+  '#414487',
+  '#355f8d',
+  '#2a788e',
+  '#21908d',
+  '#22a884',
+  '#42be71',
+  '#7ad151',
+  '#bddf26',
+]
+const NEUTRAL_COLOR = new THREE.Color(0x9ca3af)
 
 export function createPinSystem({ scene, camera, domElement, controls, getSelectedFloor, questions }) {
   const state = {
@@ -21,7 +24,8 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     pinMode: false,
     activeFloor: getSelectedFloor(),
     pendingMesh: null,
-    colorMode: 'wellbeing',
+    colorQuestionKey: null,
+    colorQuestions: [],
     lastClusterDistance: null,
     viewPin: null,
     questions: [],
@@ -46,7 +50,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     formContent,
     closeButton,
     submitButton,
-    colorModeButtons,
+    colorModeRow,
     legend,
     viewPanel,
     viewWellbeing,
@@ -95,16 +99,16 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     }
   })
 
-  colorModeButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      state.colorMode = button.dataset.mode
-      colorModeButtons.forEach((item) =>
-        item.classList.toggle('active', item.dataset.mode === state.colorMode)
-      )
-      updateLegend()
-      refreshPinColors()
-      updatePreviewColor()
-    })
+  colorModeRow.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-mode]')
+    if (!button || !colorModeRow.contains(button)) return
+    const nextKey = button.dataset.mode
+    if (!nextKey || nextKey === state.colorQuestionKey) return
+    state.colorQuestionKey = nextKey
+    updateColorModeButtons()
+    updateLegend()
+    refreshPinColors()
+    updatePreviewColor()
   })
 
   domElement.addEventListener('pointerdown', (event) => {
@@ -196,15 +200,9 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         state.optionsByQuestion.set(question.key, question.options)
       }
     })
-    const hasReasons = (state.optionsByQuestion.get('reasons') || []).length > 0
     const hasGroup = state.questions.some((question) => question.key === 'group')
-    colorModeButtons[1].style.display = hasReasons ? '' : 'none'
     viewGroupRow.style.display = hasGroup ? '' : 'none'
-    if (!hasReasons && state.colorMode === 'reasons') {
-      state.colorMode = 'wellbeing'
-      colorModeButtons[0].classList.add('active')
-      colorModeButtons[1].classList.remove('active')
-    }
+    updateColorQuestions()
     renderQuestions()
     applyQuestionLabels()
     updateLegend()
@@ -230,10 +228,10 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         const input = document.createElement('input')
         input.type = 'range'
         input.name = question.key
-        input.min = question.config?.min ?? 1
-        input.max = question.config?.max ?? 10
-        input.step = question.config?.step ?? 1
-        input.value = question.config?.default ?? 5
+        input.min = question.config?.min ?? 0
+        input.max = question.config?.max ?? 1
+        input.step = question.config?.step ?? 0.01
+        input.value = getSliderDefault(question.config)
         group.appendChild(input)
 
         const legend = document.createElement('div')
@@ -374,8 +372,8 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       submitButton.classList.add('is-hidden')
       formContent.classList.add('is-hidden')
       viewPanel.classList.remove('is-hidden')
-      viewWellbeing.textContent = `${pin.wellbeing}/10`
-      viewScoreFill.style.width = `${Math.min(Math.max((pin.wellbeing / 10) * 100, 0), 100)}%`
+      viewWellbeing.textContent = formatPercent(pin.wellbeing)
+      viewScoreFill.style.width = `${Math.min(Math.max(pin.wellbeing, 0), 100)}%`
       viewReasons.textContent = reasons.length
         ? reasons.map((key) => getOptionLabel('reasons', key)).join(', ')
         : t('ui.empty')
@@ -432,7 +430,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       const elements = state.questionElements.get(question.key)
       if (!elements) continue
       if (question.type === 'slider') {
-        answers[question.key] = Number(elements.input.value)
+        answers[question.key] = toPercentValue(elements.input.value, question.config)
       }
       if (question.type === 'text') {
         answers[question.key] = elements.input.value.trim()
@@ -561,86 +559,48 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   }
 
   function getPinColor(pin) {
-    if (state.colorMode === 'reasons') {
-      const reasons = Array.isArray(pin.reasons) ? pin.reasons : safeParseReasons(pin.reasons)
-      return getReasonColor(reasons)
-    }
-    return getWellbeingColor(pin.wellbeing)
+    const colorQuestion = getActiveColorQuestion()
+    if (!colorQuestion) return NEUTRAL_COLOR
+    const score = getPinScore(pin, colorQuestion)
+    return getSliderColor(score, colorQuestion.config)
   }
 
-  function getWellbeingColor(value) {
-    const palette = [
-      '#440154',
-      '#482475',
-      '#414487',
-      '#355f8d',
-      '#2a788e',
-      '#21908d',
-      '#22a884',
-      '#42be71',
-      '#7ad151',
-      '#bddf26',
-    ]
-    const score = Number(value || 0)
-    const index = Math.min(Math.max(Math.round(score) - 1, 0), 9)
-    return new THREE.Color(palette[index])
-  }
-
-  function getReasonColor(reasons) {
-    if (!reasons || !reasons.length) return new THREE.Color(0x9ca3af)
-    const palette = reasons.map((key) => new THREE.Color(REASON_COLORS[key] || 0x9ca3af))
-    const mixed = palette.reduce((acc, color) => acc.add(color), new THREE.Color(0, 0, 0))
-    mixed.multiplyScalar(1 / palette.length)
-    return mixed
+  function getSliderColor(value, config = {}) {
+    const min = Number.isFinite(config.min) ? Number(config.min) : 1
+    const max = Number.isFinite(config.max) ? Number(config.max) : 10
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return NEUTRAL_COLOR
+    const clamped = Math.min(Math.max(numeric, min), max)
+    const ratio = max === min ? 0 : (clamped - min) / (max - min)
+    const index = Math.min(
+      SLIDER_PALETTE.length - 1,
+      Math.max(0, Math.round(ratio * (SLIDER_PALETTE.length - 1)))
+    )
+    return new THREE.Color(SLIDER_PALETTE[index])
   }
 
   function updateLegend() {
     legend.innerHTML = ''
-    if (state.colorMode === 'wellbeing') {
-      const gradient = document.createElement('div')
-      gradient.className = 'ui-legend-gradient'
-      gradient.style.background =
-        'linear-gradient(90deg, #440154, #482475, #414487, #355f8d, #2a788e, #21908d, #22a884, #42be71, #7ad151, #bddf26)'
-      const labels = document.createElement('div')
-      labels.className = 'ui-legend-labels'
-      labels.innerHTML = `<span>${t('legend.wellbeingLow')}</span><span>${t(
-        'legend.wellbeingHigh'
-      )}</span>`
-      legend.appendChild(gradient)
-      legend.appendChild(labels)
-      return
-    }
-
-    const reasons = state.optionsByQuestion.get('reasons') || []
-    reasons.forEach((reason) => {
-      legend.appendChild(createLegendItem(reason.label || reason.key, getReasonColor([reason.key])))
-    })
-  }
-
-  function createLegendItem(label, color) {
-    const item = document.createElement('div')
-    item.className = 'ui-legend-item'
-    const swatch = document.createElement('span')
-    swatch.className = 'ui-legend-swatch'
-    swatch.style.background = color.getStyle()
-    const text = document.createElement('span')
-    text.textContent = label
-    item.appendChild(swatch)
-    item.appendChild(text)
-    return item
+    const colorQuestion = getActiveColorQuestion()
+    if (!colorQuestion) return
+    const gradient = document.createElement('div')
+    gradient.className = 'ui-legend-gradient'
+    gradient.style.background =
+      'linear-gradient(90deg, #440154, #482475, #414487, #355f8d, #2a788e, #21908d, #22a884, #42be71, #7ad151, #bddf26)'
+    const labels = document.createElement('div')
+    labels.className = 'ui-legend-labels'
+    labels.innerHTML = `<span>${colorQuestion.legend_low || ''}</span><span>${
+      colorQuestion.legend_high || ''
+    }</span>`
+    legend.appendChild(gradient)
+    legend.appendChild(labels)
   }
 
   function getColorFromForm() {
-    if (state.colorMode === 'reasons') {
-      const elements = state.questionElements.get('reasons')
-      if (!elements) return getReasonColor([])
-      const checked = elements.inputs
-        .filter((item) => item.input.checked)
-        .map((item) => item.input.value)
-      return getReasonColor(checked)
-    }
-    const elements = state.questionElements.get('wellbeing')
-    return getWellbeingColor(elements?.input?.value)
+    const colorQuestion = getActiveColorQuestion()
+    if (!colorQuestion) return NEUTRAL_COLOR
+    const elements = state.questionElements.get(colorQuestion.key)
+    return getSliderColor(elements?.input?.value, colorQuestion.config)
   }
 
   function updatePreviewColor() {
@@ -743,8 +703,6 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
   function applyStaticTranslations() {
     toggleButton.textContent = state.pinMode ? t('ui.pinToggleActive') : t('ui.pinToggleIdle')
-    colorModeButtons[0].textContent = t('ui.modeWellbeing')
-    colorModeButtons[1].textContent = t('ui.modeReasons')
     closeButton.setAttribute('aria-label', t('ui.close'))
     submitButton.textContent = t('ui.save')
     viewWellbeingLabel.textContent = t('ui.viewWellbeing')
@@ -783,6 +741,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         viewNoteLabel.textContent = question.label || t('ui.viewNote')
       }
     })
+    updateColorModeButtons()
   }
 
   function refreshViewTexts() {
@@ -818,6 +777,11 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     const elements = state.questionElements.get(key)
     if (!elements) return
     if (elements.input) {
+      const question = state.questions.find((item) => item.key === key)
+      if (question?.type === 'slider') {
+        elements.input.value = fromPercentValue(value, question.config)
+        return
+      }
       elements.input.value = value ?? ''
       return
     }
@@ -834,8 +798,119 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
   function getWellbeingValue() {
     const elements = state.questionElements.get('wellbeing')
-    if (!elements?.input) return 5
-    return Number(elements.input.value || 5)
+    if (!elements?.input) {
+      const question = state.questions.find((item) => item.key === 'wellbeing')
+      return toPercentValue(getSliderDefault(question?.config), question?.config)
+    }
+    const question = state.questions.find((item) => item.key === 'wellbeing')
+    return toPercentValue(elements.input.value || 0.5, question?.config)
+  }
+
+  function formatPercent(value) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return t('ui.empty')
+    const formatted = numeric.toLocaleString(getLocale(), {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })
+    return `${formatted}%`
+  }
+
+  function updateColorQuestions() {
+    const sliderQuestions = state.questions.filter((question) => question.type === 'slider')
+    const flagged = sliderQuestions.filter((question) => question.config?.use_for_color)
+    let colorQuestions = flagged
+    if (!colorQuestions.length) {
+      const wellbeing = sliderQuestions.find((question) => question.key === 'wellbeing')
+      colorQuestions = wellbeing ? [wellbeing] : sliderQuestions.slice(0, 1)
+    }
+    state.colorQuestions = colorQuestions
+    if (!state.colorQuestionKey || !colorQuestions.some((question) => question.key === state.colorQuestionKey)) {
+      state.colorQuestionKey = colorQuestions[0]?.key || null
+    }
+    updateColorModeButtons()
+  }
+
+  function updateColorModeButtons() {
+    colorModeRow.innerHTML = ''
+    if (state.colorQuestions.length <= 1) {
+      colorModeRow.style.display = 'none'
+      return
+    }
+    colorModeRow.style.display = ''
+    state.colorQuestions.forEach((question) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'ui-pin-mode-button'
+      button.dataset.mode = question.key
+      button.textContent = question.label || question.key
+      button.classList.toggle('active', question.key === state.colorQuestionKey)
+      colorModeRow.appendChild(button)
+    })
+  }
+
+  function getActiveColorQuestion() {
+    if (!state.colorQuestionKey) return null
+    return (
+      state.colorQuestions.find((question) => question.key === state.colorQuestionKey) ||
+      state.questions.find((question) => question.key === state.colorQuestionKey) ||
+      null
+    )
+  }
+
+  function getPinScore(pin, question) {
+    if (!question) return null
+    const key = question.key
+    if (Object.prototype.hasOwnProperty.call(pin, key)) {
+      return fromPercentValue(pin[key], question.config)
+    }
+    const answers = pin.answers || pin.answer || pin.responses
+    if (answers && Object.prototype.hasOwnProperty.call(answers, key)) {
+      return fromPercentValue(answers[key], question.config)
+    }
+    if (key === 'wellbeing') {
+      return fromPercentValue(pin.wellbeing, question.config)
+    }
+    return fromPercentValue(pin.wellbeing, question.config)
+  }
+
+  function toPercentValue(value, config = {}) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return null
+    const max = Number.isFinite(config.max) ? Number(config.max) : 1
+    const min = Number.isFinite(config.min) ? Number(config.min) : 0
+    const clamped = Math.min(Math.max(numeric, min), max)
+    if (max <= 1) {
+      return roundTwo(clamped * 100)
+    }
+    return roundTwo(((clamped - min) / (max - min)) * 100)
+  }
+
+  function fromPercentValue(value, config = {}) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return ''
+    const max = Number.isFinite(config.max) ? Number(config.max) : 1
+    const min = Number.isFinite(config.min) ? Number(config.min) : 0
+    if (max <= 1) {
+      return roundTwo(numeric / 100)
+    }
+    return roundTwo(min + (numeric / 100) * (max - min))
+  }
+
+  function roundTwo(value) {
+    return Math.round(Number(value) * 100) / 100
+  }
+
+  function getSliderDefault(config = {}) {
+    const min = Number.isFinite(config.min) ? Number(config.min) : 0
+    const max = Number.isFinite(config.max) ? Number(config.max) : 1
+    const step = Number.isFinite(config.step) && Number(config.step) > 0 ? Number(config.step) : 0.01
+    if (Number.isFinite(config.default)) {
+      return Math.min(Math.max(Number(config.default), min), max)
+    }
+    const mid = min + (max - min) / 2
+    const stepped = min + Math.round((mid - min) / step) * step
+    return Math.min(Math.max(stepped, min), max)
   }
 
   function bySort(a, b) {
@@ -856,20 +931,6 @@ function createPinUi() {
   const modeRow = document.createElement('div')
   modeRow.className = 'ui-pin-mode'
   panel.appendChild(modeRow)
-
-  const modeWellbeing = document.createElement('button')
-  modeWellbeing.type = 'button'
-  modeWellbeing.className = 'ui-pin-mode-button active'
-  modeWellbeing.textContent = t('ui.modeWellbeing')
-  modeWellbeing.dataset.mode = 'wellbeing'
-  modeRow.appendChild(modeWellbeing)
-
-  const modeReasons = document.createElement('button')
-  modeReasons.type = 'button'
-  modeReasons.className = 'ui-pin-mode-button'
-  modeReasons.textContent = t('ui.modeReasons')
-  modeReasons.dataset.mode = 'reasons'
-  modeRow.appendChild(modeReasons)
 
   const legend = document.createElement('div')
   legend.className = 'ui-legend'
@@ -950,7 +1011,7 @@ function createPinUi() {
     formContent,
     closeButton,
     submitButton,
-    colorModeButtons: [modeWellbeing, modeReasons],
+    colorModeRow: modeRow,
     legend,
     viewPanel,
     viewWellbeing: viewPanel.querySelector('.ui-pin-view-score'),
