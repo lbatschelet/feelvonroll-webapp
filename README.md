@@ -2,6 +2,7 @@
 
 Public-facing 3D web application for the [feelvonRoll](https://github.com/lbatschelet/feelvonroll) project. Users navigate a Three.js model of the Von Roll building and place pins to share how they feel in different spaces.
 
+> [!NOTE]
 > Part of the feelvonRoll project. See the [main repository](https://github.com/lbatschelet/feelvonroll) for full documentation.
 
 ## Features
