@@ -1,10 +1,33 @@
 # feelvonroll-webapp
 
+Public-facing 3D web application for the [feelvonRoll](https://github.com/lbatschelet/feelvonroll) project. Users navigate a Three.js model of the Von Roll building and place pins to share how they feel in different spaces.
+
+> Part of the feelvonRoll project. See the [main repository](https://github.com/lbatschelet/feelvonroll) for full documentation.
+
+## Features
+
+- **3D building model** rendered with Three.js, with multiple navigable floors
+- **Interactive pin placement**: click a location on any floor to start the questionnaire
+- **Dynamic questionnaire**: fetched from the API, supports sliders, multi-choice, and free text
+- **Multi-language support**: language switcher with translations loaded from the API
+
 ## Install & Run
 
 ```bash
 npm install
 npm run dev
+```
+
+The dev server starts at `http://localhost:5173`.
+
+## Configuration
+
+The webapp connects to the [feelvonroll-api](../feelvonroll-api/). By default it expects the API at `/api`.
+
+To point to a different API during development, create a `.env.local` file:
+
+```
+VITE_API_BASE=http://localhost:8080
 ```
 
 ## Build
@@ -13,26 +36,29 @@ npm run dev
 npm run build
 ```
 
+The production build is output to `dist/`. Set `VITE_API_BASE` at build time if the API is served from a different origin:
+
+```bash
+VITE_API_BASE=https://api.example.com npm run build
+```
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-## API
+## Architecture
 
-- Default expects the API at `/api`
-- Custom: set `VITE_API_BASE` at build time, e.g.
-  - `VITE_API_BASE=https://your-domain.tld/api npm run build`
+- `src/main.js` -- Entry point: initializes the Three.js scene, camera, controls, floors, and pin system
+- `src/floors.js` -- Floor geometry creation and floor switching
+- `src/pins.js` -- Pin placement, raycasting, and visualization
+- `src/ui/` -- Questionnaire UI components rendered as HTML overlays
 
-## Floors Implementation
+### Floors
 
-- Each floor is a dedicated `THREE.Group` in `floorGroups`.
-- The groups contain a slab and walls.
+Each floor is a dedicated `THREE.Group`. The groups contain slab and wall geometry. Future work: replace box geometries with loaded glTF models using `GLTFLoader`.
 
-## Next Steps (glTF)
+## License
 
-- Replace the box geometries in `createFloor()` with loaded glTF.
-- Use `GLTFLoader` from `three/examples/jsm/loaders/GLTFLoader.js`.
-- Attach loaded meshes to the respective `THREE.Group` entries.
-- Optional: one glTF per floor, or a single glTF with named nodes.
+[AGPL-3.0](../LICENSE)
