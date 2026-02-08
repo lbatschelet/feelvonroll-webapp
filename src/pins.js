@@ -193,6 +193,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     renderFormQuestions(state.questions, formContent, state.questionElements)
     applyQuestionLabels(state, uiRefs, colorMode.updateColorModeButtons)
     colorMode.updateLegend()
+    colorMode.refreshPinColors()
   }
 
   // ── Pins loading / rendering ────────────────────────────────
@@ -210,6 +211,10 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
   }
 
   function renderPins() {
+    // Remember selected pin ID so we can re-highlight after rebuild
+    const selectedPinId = state.selectedMesh?.userData?.pinData?.id ?? null
+    state.selectedMesh = null
+
     pinGroup.clear()
     const allPins = [...state.pins, ...state.localPins].filter(
       (pin) => pin.floor_index === state.activeFloor
@@ -226,9 +231,16 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         mesh.userData.pinData = pin
         mesh.userData.baseY = baseY
         pinGroup.add(mesh)
+
+        // Re-highlight if this was the selected pin
+        if (selectedPinId != null && pin.id === selectedPinId) {
+          mesh.userData.hovered = true
+          state.selectedMesh = mesh
+        }
       } else {
         const mesh = createClusterMesh(cluster, clusterTextureCache)
         mesh.position.copy(cluster.worldPosition)
+        mesh.position.y += 0.4
         mesh.userData.floorIndex = state.activeFloor
         pinGroup.add(mesh)
       }

@@ -21,7 +21,7 @@ export function buildClusters(pins, camera, controls, domElement) {
   const clusters = []
 
   pins.forEach((pin) => {
-    const world = new THREE.Vector3(pin.position_x, pin.position_y + 0.2, pin.position_z)
+    const world = new THREE.Vector3(pin.position_x, pin.position_y + 0.35, pin.position_z)
     const projected = world.clone().project(camera)
     const screen = {
       x: (projected.x * 0.5 + 0.5) * rect.width,

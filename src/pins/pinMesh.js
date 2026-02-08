@@ -61,8 +61,9 @@ export function createClusterMesh(cluster, textureCache) {
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true })
   const sprite = new THREE.Sprite(material)
   sprite.scale.set(0.7, 0.7, 1)
-  sprite.position.y += 0.5
   sprite.material.depthTest = false
+  sprite.material.depthWrite = false
+  sprite.renderOrder = 999
   return sprite
 }
 
