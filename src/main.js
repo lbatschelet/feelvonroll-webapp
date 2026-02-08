@@ -14,10 +14,13 @@ import {
 import { createBuildingProvider } from './building/buildingProvider'
 import { createFloorSelector } from './ui/floorSelector'
 import { createLanguageSwitcher } from './ui/languageSwitcher'
+import { createAboutOverlay } from './ui/aboutOverlay'
+import { createTitleBar } from './ui/titleBar'
 import { createPinSystem } from './pins'
-import { fetchLanguages, fetchQuestions } from './api'
+import { fetchLanguages, fetchQuestions, fetchContent } from './api'
 import { getFallbackQuestions } from './questionnaire'
 import { getLanguage, onLanguageChange, setLanguage, t } from './i18n'
+import { marked } from 'marked'
 
 // ── Scene setup ─────────────────────────────────────────────
 const app = document.querySelector('#app')
@@ -44,6 +47,10 @@ const { floorButtons, ui: floorSelectorUi } = createFloorSelector(
 )
 app.appendChild(floorSelectorUi)
 
+// ── Title bar ────────────────────────────────────────────────
+const titleBar = createTitleBar()
+app.appendChild(titleBar.ui)
+
 // ── Language switcher ───────────────────────────────────────
 const languageSwitcher = createLanguageSwitcher({
   languages: [],
@@ -52,6 +59,13 @@ const languageSwitcher = createLanguageSwitcher({
   onChange: (language) => setLanguage(language),
 })
 app.appendChild(languageSwitcher.ui)
+
+// ── About overlay ───────────────────────────────────────────
+const aboutOverlay = createAboutOverlay()
+
+languageSwitcher.infoButton.addEventListener('click', () => {
+  loadAboutContent(getLanguage(), true)
+})
 
 // ── Pin system ──────────────────────────────────────────────
 const pinSystem = createPinSystem({
@@ -77,10 +91,12 @@ onLanguageChange((language) => {
   languageSwitcher.setActiveLanguage(language)
   languageSwitcher.setAriaLabel(t('ui.language'))
   loadQuestions(language)
+  loadAboutContent(language)
 })
 
 loadLanguages()
 loadQuestions(getLanguage())
+loadAboutContent(getLanguage())
 
 // ── Data loading ────────────────────────────────────────────
 async function loadLanguages() {
@@ -116,6 +132,52 @@ async function loadQuestions(language) {
   }
   pinSystem.setQuestions(getFallbackQuestions())
 }
+
+// ── About content ────────────────────────────────────────────
+let aboutUpdatedAt = null
+let aboutLoaded = false
+
+async function loadAboutContent(language, forceShow = false) {
+  try {
+    const data = await fetchContent({ key: 'about', lang: language })
+    if (!data.body) {
+      if (forceShow) aboutOverlay.show()
+      return
+    }
+
+    aboutUpdatedAt = data.updated_at
+    aboutLoaded = true
+    const processed = data.body.replace(/\{\{year\}\}/g, String(new Date().getFullYear()))
+    const html = marked.parse(processed)
+    aboutOverlay.setContent(html)
+
+    if (forceShow) {
+      aboutOverlay.show()
+      return
+    }
+
+    // Auto-show overlay if content is new or updated since last dismiss
+    const dismissedAt = localStorage.getItem('about_dismissed_at')
+    if (!dismissedAt || (data.updated_at && data.updated_at > dismissedAt)) {
+      aboutOverlay.show()
+    }
+  } catch (error) {
+    console.warn('[feelvonRoll] Failed to load about content:', error)
+    if (forceShow) aboutOverlay.show()
+  }
+}
+
+// Store the dismissed timestamp when the overlay is closed
+aboutOverlay.closeButton.addEventListener('click', () => {
+  if (aboutUpdatedAt) {
+    localStorage.setItem('about_dismissed_at', aboutUpdatedAt)
+  }
+})
+aboutOverlay.backdrop.addEventListener('click', (event) => {
+  if (event.target === aboutOverlay.backdrop && aboutUpdatedAt) {
+    localStorage.setItem('about_dismissed_at', aboutUpdatedAt)
+  }
+})
 
 // ── Floor visibility ────────────────────────────────────────
 function setGroupOpacity(group, opacity) {

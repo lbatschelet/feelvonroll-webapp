@@ -48,10 +48,20 @@ export async function fetchQuestions({ lang } = {}) {
 }
 
 export async function fetchLanguages() {
-  const response = await fetch(`${API_BASE}/languages.php`)
+  const response = await fetch(`${API_BASE}/languages.php`, { cache: 'no-store' })
   if (!response.ok) {
     throw new Error(await parseError(response))
   }
+  return response.json()
+}
+
+export async function fetchContent({ key, lang } = {}) {
+  const params = new URLSearchParams()
+  if (key) params.set('key', key)
+  if (lang) params.set('lang', lang)
+  const url = `${API_BASE}/content.php?${params}`
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(await parseError(response))
   return response.json()
 }
 

@@ -1,5 +1,5 @@
 /**
- * Language switcher UI component.
+ * Language switcher UI component with info button.
  * Exports: createLanguageSwitcher.
  */
 export function createLanguageSwitcher({ languages, activeLanguage, ariaLabel, onChange }) {
@@ -10,10 +10,28 @@ export function createLanguageSwitcher({ languages, activeLanguage, ariaLabel, o
     ui.setAttribute('aria-label', ariaLabel)
   }
 
+  const topRow = document.createElement('div')
+  topRow.className = 'ui-language-top'
+
   const currentButton = document.createElement('button')
   currentButton.type = 'button'
   currentButton.className = 'ui-language-current'
-  ui.appendChild(currentButton)
+  topRow.appendChild(currentButton)
+
+  const infoButton = document.createElement('button')
+  infoButton.type = 'button'
+  infoButton.className = 'ui-info-button'
+  infoButton.setAttribute('aria-label', 'About')
+  infoButton.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="16" x2="12" y2="12"/>
+      <line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>
+  `
+  topRow.appendChild(infoButton)
+
+  ui.appendChild(topRow)
 
   const list = document.createElement('div')
   list.className = 'ui-language-list'
@@ -71,5 +89,5 @@ export function createLanguageSwitcher({ languages, activeLanguage, ariaLabel, o
   renderLanguages(languages)
   setActiveLanguage(activeLanguage)
 
-  return { ui, setActiveLanguage, setAriaLabel, setLanguages: renderLanguages }
+  return { ui, infoButton, setActiveLanguage, setAriaLabel, setLanguages: renderLanguages }
 }
