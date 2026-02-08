@@ -39,7 +39,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     panel, toggleButton, backdrop, form, formContent, closeButton, submitButton,
     colorModeRow, legend, viewPanel, viewWellbeing, viewWellbeingLabel,
     viewReasons, viewReasonsLabel, viewGroup, viewGroupLabel, viewGroupRow,
-    viewNote, viewNoteLabel, viewPending, viewTimestamp, viewScoreFill,
+    viewNote, viewNoteLabel, viewPending, viewTimestamp, viewScoreDot,
   } = ui
 
   const uiRefs = {
@@ -338,7 +338,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       formContent.classList.add('is-hidden')
       viewPanel.classList.remove('is-hidden')
       viewWellbeing.textContent = formatPercent(pin.wellbeing)
-      viewScoreFill.style.width = `${Math.min(Math.max(pin.wellbeing, 0), 100)}%`
+      viewScoreDot.style.background = colorMode.getPinColor(pin).getStyle()
       viewReasons.textContent = reasons.length
         ? reasons.map((key) => getOptionLabel(state, 'reasons', key)).join(', ')
         : t('ui.empty')

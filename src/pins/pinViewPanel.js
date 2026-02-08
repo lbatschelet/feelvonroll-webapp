@@ -8,30 +8,28 @@ import { t } from '../i18n'
  * Creates the view panel DOM and returns element references.
  * @returns {{ viewPanel, viewWellbeing, viewWellbeingLabel, viewReasons, viewReasonsLabel,
  *             viewGroup, viewGroupLabel, viewGroupRow, viewNote, viewNoteLabel,
- *             viewPending, viewTimestamp, viewScoreFill }}
+ *             viewPending, viewTimestamp, viewScoreDot }}
  */
 export function createPinViewPanel() {
   const viewPanel = document.createElement('div')
   viewPanel.className = 'ui-pin-view is-hidden'
   viewPanel.innerHTML = `
-    <div class="ui-pin-view-score-row">
-      <span>
-        <span class="ui-pin-view-label wellbeing">${t('ui.viewWellbeing')}</span>
-        <span class="ui-pin-view-score">${t('ui.empty')}</span>
-      </span>
-      <div class="ui-pin-view-bar"><span class="ui-pin-view-bar-fill"></span></div>
+    <div class="ui-pin-view-hero">
+      <div class="ui-pin-view-dot"></div>
+      <span class="ui-pin-view-score"></span>
+      <span class="ui-pin-view-label wellbeing">${t('ui.viewWellbeing')}</span>
     </div>
-    <div>
+    <div class="ui-pin-view-section">
       <span class="ui-pin-view-label reasons">${t('ui.viewReasons')}</span>
-      <span class="ui-pin-view-reasons">${t('ui.empty')}</span>
+      <span class="ui-pin-view-value ui-pin-view-reasons">${t('ui.empty')}</span>
     </div>
-    <div class="ui-pin-view-group-row">
+    <div class="ui-pin-view-section ui-pin-view-group-row">
       <span class="ui-pin-view-label group">${t('questions.group.label')}</span>
-      <span class="ui-pin-view-group">${t('ui.empty')}</span>
+      <span class="ui-pin-view-value ui-pin-view-group">${t('ui.empty')}</span>
     </div>
-    <div>
+    <div class="ui-pin-view-section">
       <span class="ui-pin-view-label note">${t('ui.viewNote')}</span>
-      <span class="ui-pin-view-note">${t('ui.empty')}</span>
+      <span class="ui-pin-view-value ui-pin-view-note">${t('ui.empty')}</span>
     </div>
     <div class="ui-pin-view-meta">
       <span class="ui-pin-view-timestamp">${t('ui.empty')}</span>
@@ -52,6 +50,6 @@ export function createPinViewPanel() {
     viewNoteLabel: viewPanel.querySelector('.ui-pin-view-label.note'),
     viewPending: viewPanel.querySelector('.ui-pin-view-pending'),
     viewTimestamp: viewPanel.querySelector('.ui-pin-view-timestamp'),
-    viewScoreFill: viewPanel.querySelector('.ui-pin-view-bar-fill'),
+    viewScoreDot: viewPanel.querySelector('.ui-pin-view-dot'),
   }
 }

@@ -213,14 +213,44 @@ canvas {
 .ui-modal {
   background: #ffffff;
   border-radius: 16px;
-  padding: 18px;
+  padding: 0;
   width: min(90vw, 360px);
+  max-height: min(85vh, 600px);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
   display: flex;
   flex-direction: column;
-  gap: 12px;
   position: relative;
-  padding-top: 28px;
+  overflow: hidden;
+}
+
+.ui-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.85rem;
+  padding: 28px 18px 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.ui-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ui-form::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-form::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.ui-form::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 
@@ -246,13 +276,6 @@ canvas {
   stroke: #111827;
   stroke-width: 2;
   fill: none;
-}
-
-.ui-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 0.85rem;
 }
 
 .ui-form input[type='range'] {
@@ -333,37 +356,71 @@ canvas {
 }
 
 .ui-pin-view {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   font-size: 0.85rem;
   color: #1f2937;
 }
 
-.ui-pin-view-score-row {
-  display: grid;
+.ui-pin-view-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
+  padding: 12px 0 4px;
 }
 
-.ui-pin-view-bar {
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  overflow: hidden;
+.ui-pin-view-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #9ca3af;
 }
 
-.ui-pin-view-bar-fill {
-  display: block;
-  height: 100%;
-  background: #1f2937;
-  width: 0%;
+.ui-pin-view-score {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.ui-pin-view-hero .ui-pin-view-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ui-pin-view-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ui-pin-view-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.ui-pin-view-value {
+  font-weight: 400;
+  color: #4b5563;
+  line-height: 1.45;
+  text-align: justify;
+  overflow-wrap: break-word;
 }
 
 .ui-pin-view-meta {
-  font-size: 0.75rem;
-  color: #64748b;
-  display: grid;
-  gap: 4px;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .ui-pin-view-pending {
