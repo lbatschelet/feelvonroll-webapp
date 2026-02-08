@@ -1,6 +1,8 @@
+/**
+ * Application entry point.
+ * Wires together scene, building, pin system, and UI.
+ */
 import './style.css'
-import * as THREE from 'three'
-import { BUILDINGS, FLOOR } from './config'
 import {
   addLights,
   createCamera,
@@ -9,15 +11,16 @@ import {
   createRenderer,
   createScene,
 } from './scene'
-import { createFloorGroup, setFloorWallMode } from './floors'
-import { createFloorSelector, createLanguageSwitcher } from './ui'
+import { createBuildingProvider } from './building/buildingProvider'
+import { createFloorSelector } from './ui/floorSelector'
+import { createLanguageSwitcher } from './ui/languageSwitcher'
 import { createPinSystem } from './pins'
 import { fetchLanguages, fetchQuestions } from './api'
 import { getFallbackQuestions } from './questionnaire'
 import { getLanguage, onLanguageChange, setLanguage, t } from './i18n'
 
+// ── Scene setup ─────────────────────────────────────────────
 const app = document.querySelector('#app')
-
 setLanguage(getLanguage())
 
 const renderer = createRenderer(app)
@@ -28,30 +31,20 @@ const ground = createGround()
 scene.add(ground)
 addLights(scene)
 
-const floorGroups = []
-const maxAboveGroundFloors = Math.max(...BUILDINGS.map((building) => building.floors))
-const maxBasements = Math.max(...BUILDINGS.map((building) => building.basements))
+// ── Building ────────────────────────────────────────────────
+const building = createBuildingProvider(scene, 'procedural')
 
-BUILDINGS.forEach((building, buildingIndex) => {
-  const buildingGroup = new THREE.Group()
-  buildingGroup.position.copy(building.offset)
-  buildingGroup.userData.buildingIndex = buildingIndex
-
-  for (let floorIndex = -building.basements; floorIndex < building.floors; floorIndex += 1) {
-    const floorGroup = createFloorGroup(floorIndex)
-    floorGroup.userData.buildingIndex = buildingIndex
-    floorGroups.push(floorGroup)
-    buildingGroup.add(floorGroup)
-  }
-
-  scene.add(buildingGroup)
-})
-
+// ── Floor selector ──────────────────────────────────────────
 let selectedFloor = 0
-let currentTargetY = getTargetYForFloor(selectedFloor)
+let currentTargetY = building.getTargetYForFloor(selectedFloor)
 
-const { floorButtons, ui } = createFloorSelector(maxBasements, maxAboveGroundFloors)
-app.appendChild(ui)
+const { floorButtons, ui: floorSelectorUi } = createFloorSelector(
+  building.maxBasements,
+  building.maxAboveGroundFloors
+)
+app.appendChild(floorSelectorUi)
+
+// ── Language switcher ───────────────────────────────────────
 const languageSwitcher = createLanguageSwitcher({
   languages: [],
   activeLanguage: getLanguage(),
@@ -59,6 +52,8 @@ const languageSwitcher = createLanguageSwitcher({
   onChange: (language) => setLanguage(language),
 })
 app.appendChild(languageSwitcher.ui)
+
+// ── Pin system ──────────────────────────────────────────────
 const pinSystem = createPinSystem({
   scene,
   camera,
@@ -69,6 +64,7 @@ const pinSystem = createPinSystem({
 })
 app.appendChild(pinSystem.ui)
 
+// ── Events ──────────────────────────────────────────────────
 floorButtons.forEach((button) => {
   button.addEventListener('click', () => setSelectedFloor(Number(button.dataset.index)))
 })
@@ -86,18 +82,21 @@ onLanguageChange((language) => {
 loadLanguages()
 loadQuestions(getLanguage())
 
+// ── Data loading ────────────────────────────────────────────
 async function loadLanguages() {
   try {
     const languages = await fetchLanguages()
     if (languages.length) {
-      languageSwitcher.setLanguages(languages.map((item) => ({ id: item.lang, label: item.label })))
+      languageSwitcher.setLanguages(
+        languages.map((item) => ({ id: item.lang, label: item.label }))
+      )
       if (!languages.some((item) => item.lang === getLanguage())) {
         setLanguage(languages[0].lang)
       }
       return
     }
-  } catch (error) {
-    // ignore and fall back to defaults
+  } catch {
+    // fall back to defaults
   }
   languageSwitcher.setLanguages([
     { id: 'de', label: 'DE' },
@@ -112,20 +111,13 @@ async function loadQuestions(language) {
       pinSystem.setQuestions(questions)
       return
     }
-  } catch (error) {
-    // ignore and fall back to defaults
+  } catch {
+    // fall back to defaults
   }
   pinSystem.setQuestions(getFallbackQuestions())
 }
 
-function getTargetYForFloor(floorIndex) {
-  return (
-    floorIndex * (FLOOR.height + FLOOR.slabThickness) +
-    FLOOR.slabThickness +
-    FLOOR.wallHeight * 0.55
-  )
-}
-
+// ── Floor visibility ────────────────────────────────────────
 function setGroupOpacity(group, opacity) {
   group.traverse((child) => {
     if (child.material) {
@@ -139,26 +131,24 @@ function setGroupOpacity(group, opacity) {
 }
 
 function updateFloorVisibility() {
-  floorGroups.forEach((group) => {
+  building.floorGroups.forEach((group) => {
     const floorIndex = group.userData.floorIndex
     if (floorIndex > selectedFloor) {
       group.visible = false
       return
     }
-
     group.visible = true
     if (floorIndex === selectedFloor) {
-      setFloorWallMode(group, true)
+      building.setFloorWallMode(group, true)
       setGroupOpacity(group, 1)
     } else {
-      setFloorWallMode(group, false)
+      building.setFloorWallMode(group, false)
       setGroupOpacity(group, 0.35)
     }
   })
 
   floorButtons.forEach((button) => {
-    const buttonFloorIndex = Number(button.dataset.index)
-    button.classList.toggle('active', buttonFloorIndex === selectedFloor)
+    button.classList.toggle('active', Number(button.dataset.index) === selectedFloor)
   })
 
   ground.visible = selectedFloor >= 0
@@ -167,10 +157,11 @@ function updateFloorVisibility() {
 
 function setSelectedFloor(nextIndex) {
   selectedFloor = nextIndex
-  currentTargetY = getTargetYForFloor(selectedFloor)
+  currentTargetY = building.getTargetYForFloor(selectedFloor)
   updateFloorVisibility()
 }
 
+// ── Render loop ─────────────────────────────────────────────
 function handleResize() {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
