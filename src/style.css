@@ -708,6 +708,11 @@ button:focus-visible {
   opacity: 1;
 }
 
+/* Mobile logos clone (shown above footer on small screens) */
+.about-logos-mobile {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .ui-floor {
     right: calc(10px + env(safe-area-inset-right, 0px));
@@ -740,17 +745,22 @@ button:focus-visible {
     width: min(100%, 640px);
   }
 
-  .about-header {
-    flex-direction: column;
-    gap: 10px;
-  }
-
   .about-header-logos {
-    align-self: flex-start;
+    display: none;
   }
 
-  .about-header-logos img {
+  .about-logos-mobile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0 8px;
+  }
+
+  .about-logos-mobile img {
     height: 28px;
+    width: auto;
+    display: block;
+    opacity: 0.75;
   }
 
   .about-footer {

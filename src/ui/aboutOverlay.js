@@ -46,6 +46,18 @@ export function createAboutOverlay() {
 
   function setContent(html) {
     contentArea.innerHTML = html
+
+    // Clone header logos for mobile placement (above footer)
+    const existingMobileLogos = contentArea.querySelector('.about-logos-mobile')
+    if (existingMobileLogos) existingMobileLogos.remove()
+
+    const headerLogos = contentArea.querySelector('.about-header-logos')
+    const footer = contentArea.querySelector('.about-footer')
+    if (headerLogos && footer) {
+      const mobileLogos = headerLogos.cloneNode(true)
+      mobileLogos.className = 'about-logos-mobile'
+      footer.parentNode.insertBefore(mobileLogos, footer)
+    }
   }
 
   document.body.appendChild(backdrop)
