@@ -1,9 +1,9 @@
 # feelvonroll-webapp
 
-Public-facing 3D web application for the [feelvonRoll](https://github.com/lbatschelet/feelvonroll) project. Users navigate a Three.js model of the Von Roll building and place pins to share how they feel in different spaces.
+Public-facing 3D web application for the [feelvonRoll](https://github.com/lbatschelet/feelvonroll) project. Users navigate a Three.js model of the vonRoll building and place pins to share how they feel in different spaces.
 
 > [!NOTE]
-> Part of the feelvonRoll project. See the [main repository](https://github.com/lbatschelet/feelvonroll) for full documentation.
+> Part of the [feelvonRoll](https://github.com/lbatschelet/feelvonroll) project, developed for [PHBern](https://www.phbern.ch) within [RealTransform](https://sustainability.uzh.ch/de/forschung-lehre/forschung/realtransform.html). See the [main repository](https://github.com/lbatschelet/feelvonroll) for full documentation and project context.
 
 ## Features
 
@@ -62,4 +62,4 @@ Each floor is a dedicated `THREE.Group`. The groups contain slab and wall geomet
 
 ## License
 
-[AGPL-3.0](../LICENSE)
+[AGPL-3.0](../LICENSE) -- [Lukas Batschelet](https://lukasbatschelet.ch) for [PHBern](https://www.phbern.ch)
