@@ -225,9 +225,11 @@ function setSelectedFloor(nextIndex) {
 
 // ── Render loop ─────────────────────────────────────────────
 function handleResize() {
-  camera.aspect = window.innerWidth / window.innerHeight
+  const w = app.clientWidth
+  const h = app.clientHeight
+  camera.aspect = w / h
   camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
+  renderer.setSize(w, h)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 }
 

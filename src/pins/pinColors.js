@@ -1,20 +1,22 @@
 /**
  * Pin color utilities.
- * Maps slider values to a Viridis-inspired palette.
+ * Maps slider values to a colorblind-friendly palette.
+ * Luminance increases monotonically (primary cue).
+ * Hue shifts purple → pink → orange → yellow (no greens).
  */
 import * as THREE from 'three'
 
 export const SLIDER_PALETTE = [
-  '#440154',
-  '#482475',
-  '#414487',
-  '#355f8d',
-  '#2a788e',
-  '#21908d',
-  '#22a884',
-  '#42be71',
-  '#7ad151',
-  '#bddf26',
+  '#6c2fa0',
+  '#8b3fc7',
+  '#b545c9',
+  '#db4ca1',
+  '#f25c78',
+  '#ff7b54',
+  '#ffa042',
+  '#ffc639',
+  '#ffe145',
+  '#fff176',
 ]
 
 export const NEUTRAL_COLOR = new THREE.Color(0x9ca3af)

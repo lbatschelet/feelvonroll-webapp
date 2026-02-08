@@ -5,7 +5,7 @@ import { VIEW } from './config'
 export function createRenderer(app) {
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setSize(window.innerWidth, window.innerHeight)
+  renderer.setSize(app.clientWidth, app.clientHeight)
   renderer.setClearColor(VIEW.background, 1)
   app.appendChild(renderer.domElement)
   return renderer
@@ -26,6 +26,8 @@ export function createCamera() {
 export function createControls(camera, domElement) {
   const controls = new OrbitControls(camera, domElement)
   controls.enableDamping = true
+  controls.dampingFactor = 0.3
+  controls.panSpeed = 1.2
   controls.enablePan = true
   controls.enableZoom = true
   controls.enableRotate = false

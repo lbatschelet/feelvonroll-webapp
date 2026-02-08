@@ -15,8 +15,9 @@ import * as THREE from 'three'
 export function buildClusters(pins, camera, controls, domElement) {
   const rect = domElement.getBoundingClientRect()
   const distance = camera.position.distanceTo(controls.target)
+  // No clustering when zoomed in close (distance < 10), scales up when zoomed out
   const t = Math.min(Math.max((distance - 10) / 30, 0), 1)
-  const threshold = 14 + t * 24
+  const threshold = t * 38
   const clusters = []
 
   pins.forEach((pin) => {

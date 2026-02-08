@@ -283,6 +283,22 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     renderPins()
   }
 
+  // ── Helpers ─────────────────────────────────────────────────
+  function findPinMesh(pinId) {
+    if (!pinId) return null
+    for (const group of pinGroup.children) {
+      if (group.userData.pinData && group.userData.pinData.id === pinId) return group
+    }
+    return null
+  }
+
+  function clearSelectedHighlight() {
+    if (state.selectedMesh) {
+      state.selectedMesh.userData.hovered = false
+      state.selectedMesh = null
+    }
+  }
+
   // ── Form open / close ───────────────────────────────────────
   function openForm({ floorIndex, position, pin }) {
     form.reset()
@@ -291,6 +307,13 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     state.viewPin = pin || null
 
     if (pin) {
+      // Highlight the tapped pin (lift + glow, same as hover)
+      clearSelectedHighlight()
+      const mesh = findPinMesh(pin.id)
+      if (mesh) {
+        mesh.userData.hovered = true
+        state.selectedMesh = mesh
+      }
       const reasons = safeParseReasons(pin.reasons)
       const group = pin.group_key || ''
       setQuestionValue('wellbeing', pin.wellbeing, state.questions, state.questionElements)
@@ -334,6 +357,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     form.dataset.y = ''
     form.dataset.z = ''
     state.viewPin = null
+    clearSelectedHighlight()
     if (form.dataset.mode === 'create') {
       removePendingPin()
     }
