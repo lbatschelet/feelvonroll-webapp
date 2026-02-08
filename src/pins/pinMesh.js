@@ -4,32 +4,49 @@
  */
 import * as THREE from 'three'
 
+/* ── Shared geometry (created once, reused by all pins) ─────────── */
+
+const SPHERE_RADIUS = 0.18
+let _sharedGeo = null
+
+function getSharedSphereGeometry() {
+  if (!_sharedGeo) _sharedGeo = new THREE.SphereGeometry(SPHERE_RADIUS, 32, 24)
+  return _sharedGeo
+}
+
+/* ── Pin mesh (glass orb + hit sphere) ──────────────────────────── */
+
 /**
- * Creates a single pin mesh (stem + head).
+ * Creates a single pin as a translucent glass orb + invisible hit sphere.
+ * Uses MeshPhysicalMaterial with transmission for realistic glass look.
  * @param {object} pin - Pin data.
- * @param {THREE.Color} headColor - Color for the pin head.
+ * @param {THREE.Color} headColor - Tint color for the glass.
  * @returns {THREE.Group}
  */
 export function createPinMesh(pin, headColor) {
   const group = new THREE.Group()
 
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.018, 0.026, 0.55, 10),
-    new THREE.MeshStandardMaterial({ color: 0x4b5563 })
+  const orb = new THREE.Mesh(
+    getSharedSphereGeometry(),
+    new THREE.MeshLambertMaterial({
+      color: headColor,
+      emissive: headColor,
+      emissiveIntensity: 0.25,
+    })
   )
-  stem.position.y = 0.25
+  orb.userData.pinData = pin
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.12, 16, 12),
-    new THREE.MeshStandardMaterial({ color: headColor })
+  // Slightly larger invisible sphere for easier click/hover targeting
+  const hitSphere = new THREE.Mesh(
+    new THREE.SphereGeometry(SPHERE_RADIUS * 1.25, 8, 6),
+    new THREE.MeshBasicMaterial({ visible: false })
   )
-  head.position.y = 0.52
+  hitSphere.userData.pinData = pin
+  hitSphere.userData.isHitSphere = true
 
-  group.add(stem, head)
+  group.add(orb, hitSphere)
   group.userData.pinData = pin
-  stem.userData.pinData = pin
-  head.userData.pinData = pin
-  group.userData.head = head
+  group.userData.orb = orb
   return group
 }
 

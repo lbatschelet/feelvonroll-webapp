@@ -54,23 +54,27 @@ export function createPinColorMode({ state, legend, colorModeRow, form, pinGroup
     form.style.setProperty('--pin-accent', color.getStyle())
   }
 
-  /** Re-color all rendered pin head meshes. */
+  /** Re-color all rendered pin orb meshes. */
   function refreshPinColors() {
     pinGroup.children.forEach((mesh) => {
       const pin = mesh.userData.pinData
-      const head = mesh.userData.head
-      if (pin && head) {
-        head.material.color.set(getPinColor(pin))
+      const orb = mesh.userData.orb
+      if (pin && orb) {
+        const color = getPinColor(pin)
+        orb.material.color.set(color)
+        orb.material.emissive.set(color)
       }
     })
   }
 
-  /** Re-color the pending (draft) pin head mesh, if any. */
+  /** Re-color the pending (draft) pin orb mesh, if any. */
   function refreshPendingPinColor() {
     if (!state.pendingMesh) return
-    const head = state.pendingMesh.userData.head
-    if (!head) return
-    head.material.color.set(getColorFromForm())
+    const orb = state.pendingMesh.userData.orb
+    if (!orb) return
+    const color = getColorFromForm()
+    orb.material.color.set(color)
+    orb.material.emissive.set(color)
   }
 
   /** Rebuild the legend gradient + labels. */

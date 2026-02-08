@@ -160,6 +160,20 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
         state.lastClusterDistance = distance
         renderPins()
       }
+
+      // Hover animation: smooth lift + emissive glow
+      pinGroup.children.forEach((group) => {
+        if (group.userData.baseY === undefined) return
+        const targetY = group.userData.hovered ? group.userData.baseY + 0.08 : group.userData.baseY
+        group.position.y = THREE.MathUtils.lerp(group.position.y, targetY, 0.1)
+        const orb = group.userData.orb
+        if (orb) {
+          const targetGlow = group.userData.hovered ? 0.5 : 0.25
+          orb.material.emissiveIntensity = THREE.MathUtils.lerp(
+            orb.material.emissiveIntensity, targetGlow, 0.1
+          )
+        }
+      })
     },
     setQuestions,
   }
@@ -205,10 +219,12 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       if (cluster.pins.length === 1) {
         const pin = cluster.pins[0]
         const mesh = createPinMesh(pin, colorMode.getPinColor(pin))
-        mesh.position.set(pin.position_x, pin.position_y + 0.2, pin.position_z)
+        const baseY = pin.position_y + 0.35
+        mesh.position.set(pin.position_x, baseY, pin.position_z)
         mesh.userData.floorIndex = pin.floor_index
         mesh.userData.pinId = pin.id
         mesh.userData.pinData = pin
+        mesh.userData.baseY = baseY
         pinGroup.add(mesh)
       } else {
         const mesh = createClusterMesh(cluster, clusterTextureCache)
@@ -242,8 +258,10 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       group_key: null,
     }
     const mesh = createPinMesh(draft, colorMode.getPinColor(draft))
-    mesh.position.set(position.x, position.y + 0.2, position.z)
+    const baseY = position.y + 0.35
+    mesh.position.set(position.x, baseY, position.z)
     mesh.userData.floorIndex = floorIndex
+    mesh.userData.baseY = baseY
     pinGroup.add(mesh)
     state.pendingMesh = mesh
   }
