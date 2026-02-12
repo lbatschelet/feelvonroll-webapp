@@ -131,7 +131,27 @@ export function collectFormData(form, questions, questionElements) {
     }
   }
 
-  return { floor_index: floorIndex, x, y, z, answers }
+  const result = { floor_index: floorIndex, x, y, z, answers }
+
+  // Include station_key if set (from station mode)
+  const stationKey = form.dataset.stationKey
+  if (stationKey) {
+    result.station_key = stationKey
+  }
+
+  // Separate known hardcoded answers from generic ones
+  const knownKeys = new Set(['wellbeing', 'reasons', 'group', 'note'])
+  const genericAnswers = {}
+  for (const [key, value] of Object.entries(answers)) {
+    if (!knownKeys.has(key)) {
+      genericAnswers[key] = value
+    }
+  }
+  if (Object.keys(genericAnswers).length > 0) {
+    result.generic_answers = genericAnswers
+  }
+
+  return result
 }
 
 /**

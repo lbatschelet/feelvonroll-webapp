@@ -176,6 +176,9 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       })
     },
     setQuestions,
+    setStationKey: (key) => {
+      form.dataset.stationKey = key || ''
+    },
   }
 
   // ── Questions ───────────────────────────────────────────────
