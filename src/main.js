@@ -17,10 +17,15 @@ import { createLanguageSwitcher } from './ui/languageSwitcher'
 import { createAboutOverlay } from './ui/aboutOverlay'
 import { createTitleBar } from './ui/titleBar'
 import { createPinSystem } from './pins'
-import { fetchLanguages, fetchQuestions, fetchContent } from './api'
+import { fetchLanguages, fetchQuestions, fetchContent, fetchStation, fetchQuestionnaire } from './api'
 import { getFallbackQuestions } from './questionnaire'
 import { getLanguage, onLanguageChange, setLanguage, t } from './i18n'
 import { marked } from 'marked'
+
+// ── URL parameters ──────────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search)
+const captureMode = urlParams.get('mode') === 'capture'
+const stationKey = urlParams.get('station')
 
 // ── Scene setup ─────────────────────────────────────────────
 const app = document.querySelector('#app')
@@ -95,7 +100,15 @@ onLanguageChange((language) => {
 })
 
 loadLanguages()
-loadQuestions(getLanguage())
+
+// ── Capture mode ─────────────────────────────────────────────
+if (captureMode) {
+  bootCaptureMode()
+} else if (stationKey) {
+  bootStationMode(stationKey)
+} else {
+  loadQuestions(getLanguage())
+}
 loadAboutContent(getLanguage())
 
 // ── Data loading ────────────────────────────────────────────
@@ -178,6 +191,115 @@ aboutOverlay.backdrop.addEventListener('click', (event) => {
     localStorage.setItem('about_dismissed_at', aboutUpdatedAt)
   }
 })
+
+// ── Capture mode ─────────────────────────────────────────────
+function bootCaptureMode() {
+  // Hide pin system UI in capture mode
+  pinSystem.ui.style.display = 'none'
+
+  // Create capture UI overlay
+  const captureUI = document.createElement('div')
+  captureUI.id = 'capture-overlay'
+  captureUI.innerHTML = `
+    <div class="capture-banner">
+      <p><strong>Capture Mode</strong> — Navigate to the desired position, then click "Capture".</p>
+      <div class="capture-actions">
+        <button id="captureBtn" class="capture-btn">Capture Position</button>
+        <button id="captureCancelBtn" class="capture-btn secondary">Cancel</button>
+      </div>
+    </div>
+  `
+  app.appendChild(captureUI)
+
+  document.getElementById('captureBtn').addEventListener('click', () => {
+    const cameraPos = camera.position.clone()
+    const targetPos = controls.target.clone()
+
+    const message = {
+      type: 'feelvonroll-capture',
+      camera: { x: cameraPos.x, y: cameraPos.y, z: cameraPos.z },
+      target: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+      floor_index: selectedFloor,
+    }
+
+    if (window.opener) {
+      window.opener.postMessage(message, '*')
+    }
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(message, '*')
+    }
+  })
+
+  document.getElementById('captureCancelBtn').addEventListener('click', () => {
+    window.close()
+  })
+}
+
+// ── Station mode ─────────────────────────────────────────────
+async function bootStationMode(key) {
+  // Set the station key on the pin form so it's included in submissions
+  pinSystem.setStationKey(key)
+
+  try {
+    const station = await fetchStation(key)
+
+    // Animate camera to station position
+    if (station.camera && station.target) {
+      const targetFloor = station.floor_index ?? 0
+      setSelectedFloor(targetFloor)
+
+      // Smooth camera animation
+      const startCam = camera.position.clone()
+      const startTarget = controls.target.clone()
+      const endCam = { x: station.camera.x, y: station.camera.y, z: station.camera.z }
+      const endTarget = { x: station.target.x, y: station.target.y, z: station.target.z }
+
+      const duration = 1500 // ms
+      const startTime = performance.now()
+
+      function animateCamera(now) {
+        const elapsed = now - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        // Ease out cubic
+        const t = 1 - Math.pow(1 - progress, 3)
+
+        camera.position.set(
+          startCam.x + (endCam.x - startCam.x) * t,
+          startCam.y + (endCam.y - startCam.y) * t,
+          startCam.z + (endCam.z - startCam.z) * t,
+        )
+        controls.target.set(
+          startTarget.x + (endTarget.x - startTarget.x) * t,
+          startTarget.y + (endTarget.y - startTarget.y) * t,
+          startTarget.z + (endTarget.z - startTarget.z) * t,
+        )
+
+        if (progress < 1) {
+          requestAnimationFrame(animateCamera)
+        }
+      }
+      requestAnimationFrame(animateCamera)
+    }
+
+    // Load station-specific questionnaire
+    const questionnaireKey = station.questionnaire_key || 'default'
+    const lang = getLanguage()
+    try {
+      const questions = await fetchQuestionnaire({ key: questionnaireKey, lang })
+      if (Array.isArray(questions) && questions.length) {
+        pinSystem.setQuestions(questions)
+        return
+      }
+    } catch {
+      // Fall through to default questionnaire
+    }
+  } catch (error) {
+    console.warn('[feelvonRoll] Failed to load station:', error)
+  }
+
+  // Fallback: load default questions
+  loadQuestions(getLanguage())
+}
 
 // ── Floor visibility ────────────────────────────────────────
 function setGroupOpacity(group, opacity) {

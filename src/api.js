@@ -65,6 +65,26 @@ export async function fetchContent({ key, lang } = {}) {
   return response.json()
 }
 
+export async function fetchStation(key) {
+  const response = await fetch(`${API_BASE}/stations.php?key=${encodeURIComponent(key)}`)
+  if (!response.ok) {
+    throw new Error(await parseError(response))
+  }
+  return response.json()
+}
+
+export async function fetchQuestionnaire({ key, lang }) {
+  const params = new URLSearchParams()
+  if (key) params.set('key', key)
+  if (lang) params.set('lang', lang)
+  const url = `${API_BASE}/questionnaire.php?${params}`
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(await parseError(response))
+  }
+  return response.json()
+}
+
 async function parseError(response) {
   let text = ''
   try {
