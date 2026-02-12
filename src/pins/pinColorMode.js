@@ -104,6 +104,11 @@ export function createPinColorMode({ state, legend, colorModeRow, form, pinGroup
       const wellbeing = sliderQuestions.find((q) => q.key === 'wellbeing')
       colorQuestions = wellbeing ? [wellbeing] : sliderQuestions.slice(0, 1)
     }
+    // If station questionnaire has no suitable color slider, fall back to
+    // the global question library (loaded separately for color purposes).
+    if (!colorQuestions.length && state.globalColorQuestions?.length) {
+      colorQuestions = [...state.globalColorQuestions]
+    }
     state.colorQuestions = colorQuestions
     if (!state.colorQuestionKey || !colorQuestions.some((q) => q.key === state.colorQuestionKey)) {
       state.colorQuestionKey = colorQuestions[0]?.key || null

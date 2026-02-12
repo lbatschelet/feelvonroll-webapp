@@ -27,6 +27,7 @@ const urlParams = new URLSearchParams(window.location.search)
 const captureMode = urlParams.get('mode') === 'capture'
 const stationKey = urlParams.get('station')
 
+
 // ── Scene setup ─────────────────────────────────────────────
 const app = document.querySelector('#app')
 setLanguage(getLanguage())
@@ -85,7 +86,9 @@ app.appendChild(pinSystem.ui)
 
 // ── Events ──────────────────────────────────────────────────
 floorButtons.forEach((button) => {
-  button.addEventListener('click', () => setSelectedFloor(Number(button.dataset.index)))
+  button.addEventListener('click', () => {
+    setSelectedFloor(Number(button.dataset.index))
+  })
 })
 
 setSelectedFloor(selectedFloor)
@@ -240,50 +243,33 @@ async function bootStationMode(key) {
   // Set the station key on the pin form so it's included in submissions
   pinSystem.setStationKey(key)
 
+  const lang = getLanguage()
+
+  // Load the full question library for pin color config (runs in parallel)
+  const globalQuestionsPromise = fetchQuestions({ lang }).catch(() => [])
+
   try {
     const station = await fetchStation(key)
-
-    // Animate camera to station position
+    // Position camera at station immediately (no animation)
     if (station.camera && station.target) {
       const targetFloor = station.floor_index ?? 0
       setSelectedFloor(targetFloor)
 
-      // Smooth camera animation
-      const startCam = camera.position.clone()
-      const startTarget = controls.target.clone()
-      const endCam = { x: station.camera.x, y: station.camera.y, z: station.camera.z }
-      const endTarget = { x: station.target.x, y: station.target.y, z: station.target.z }
+      // Set camera and target directly, keeping Y consistent with floor system
+      const camOffsetY = station.camera.y - station.target.y
+      controls.target.set(station.target.x, currentTargetY, station.target.z)
+      camera.position.set(station.camera.x, currentTargetY + camOffsetY, station.camera.z)
+      controls.update()
+    }
 
-      const duration = 1500 // ms
-      const startTime = performance.now()
-
-      function animateCamera(now) {
-        const elapsed = now - startTime
-        const progress = Math.min(elapsed / duration, 1)
-        // Ease out cubic
-        const t = 1 - Math.pow(1 - progress, 3)
-
-        camera.position.set(
-          startCam.x + (endCam.x - startCam.x) * t,
-          startCam.y + (endCam.y - startCam.y) * t,
-          startCam.z + (endCam.z - startCam.z) * t,
-        )
-        controls.target.set(
-          startTarget.x + (endTarget.x - startTarget.x) * t,
-          startTarget.y + (endTarget.y - startTarget.y) * t,
-          startTarget.z + (endTarget.z - startTarget.z) * t,
-        )
-
-        if (progress < 1) {
-          requestAnimationFrame(animateCamera)
-        }
-      }
-      requestAnimationFrame(animateCamera)
+    // Store global color questions before setting station-specific ones
+    const globalQuestions = await globalQuestionsPromise
+    if (Array.isArray(globalQuestions) && globalQuestions.length) {
+      pinSystem.setGlobalColorQuestions(globalQuestions)
     }
 
     // Load station-specific questionnaire
     const questionnaireKey = station.questionnaire_key || 'default'
-    const lang = getLanguage()
     try {
       const questions = await fetchQuestionnaire({ key: questionnaireKey, lang })
       if (Array.isArray(questions) && questions.length) {
@@ -298,7 +284,7 @@ async function bootStationMode(key) {
   }
 
   // Fallback: load default questions
-  loadQuestions(getLanguage())
+  loadQuestions(lang)
 }
 
 // ── Floor visibility ────────────────────────────────────────
@@ -357,12 +343,16 @@ function handleResize() {
 
 function animate() {
   requestAnimationFrame(animate)
+
   controls.update()
-  pinSystem.update()
+
+  // Floor-level Y-forcing: keep camera and target locked to the active floor
   const deltaY = currentTargetY - controls.target.y
   if (Math.abs(deltaY) > 1e-6) {
     controls.target.y += deltaY
     camera.position.y += deltaY
   }
+
+  pinSystem.update()
   renderer.render(scene, camera)
 }

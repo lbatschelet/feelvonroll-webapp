@@ -18,6 +18,7 @@ export function createPinState(activeFloor) {
     pendingMesh: null,
     colorQuestionKey: null,
     colorQuestions: [],
+    globalColorQuestions: [],
     lastClusterDistance: null,
     viewPin: null,
     questions: [],
