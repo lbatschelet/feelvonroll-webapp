@@ -10,7 +10,10 @@ Public-facing 3D web application for the [feelvonRoll](https://github.com/lbatsc
 - **3D building model** rendered with Three.js, with multiple navigable floors
 - **Interactive pin placement**: click a location on any floor to start the questionnaire
 - **Dynamic questionnaire**: fetched from the API, supports sliders, multi-choice, and free text
+- **Station mode**: QR code links pre-position the camera and load a station-specific questionnaire
+- **Pin coloring**: pins are colored by a configurable slider (e.g. wellbeing), with a gradient legend
 - **Multi-language support**: language switcher with translations loaded from the API
+- **About overlay**: markdown content page with auto-show on update
 
 ## Install & Run
 
@@ -51,14 +54,13 @@ npm test
 
 ## Architecture
 
-- `src/main.js` -- Entry point: initializes the Three.js scene, camera, controls, floors, and pin system
-- `src/floors.js` -- Floor geometry creation and floor switching
-- `src/pins.js` -- Pin placement, raycasting, and visualization
-- `src/ui/` -- Questionnaire UI components rendered as HTML overlays
-
-### Floors
-
-Each floor is a dedicated `THREE.Group`. The groups contain slab and wall geometry. Future work: replace box geometries with loaded glTF models using `GLTFLoader`.
+- `src/main.js` -- Entry point: scene setup, station/capture mode routing, floor visibility
+- `src/building/` -- Procedural building geometry (floors, walls)
+- `src/pins.js` -- Pin system orchestrator (state, rendering, raycasting, colors)
+- `src/pins/` -- Pin subsystems: color mode, clustering, form, mesh, raycaster, translations
+- `src/ui/` -- UI overlays: floor selector, language switcher, about overlay, title bar
+- `src/api.js` -- API client (pins, questions, questionnaires, stations, content, languages)
+- `src/i18n.js` -- Internationalization with translation loading
 
 ## License
 

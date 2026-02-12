@@ -825,3 +825,63 @@ button:focus-visible {
     align-items: flex-start;
   }
 }
+
+/* ── Capture Mode ──────────────────────────── */
+
+#capture-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.capture-banner {
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: all;
+}
+
+.capture-banner p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.capture-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.capture-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #0066cc;
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.capture-btn:hover {
+  background: #0052a3;
+}
+
+.capture-btn.secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ccc;
+}
+
+.capture-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}

@@ -176,6 +176,10 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
       })
     },
     setQuestions,
+    setGlobalColorQuestions,
+    setStationKey: (key) => {
+      form.dataset.stationKey = key || ''
+    },
   }
 
   // ── Questions ───────────────────────────────────────────────
@@ -194,6 +198,21 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     applyQuestionLabels(state, uiRefs, colorMode.updateColorModeButtons)
     colorMode.updateLegend()
     colorMode.refreshPinColors()
+  }
+
+  /**
+   * Store the global color-driving questions (from the full library).
+   * Used as fallback when a station questionnaire has no use_for_color slider.
+   */
+  function setGlobalColorQuestions(allQuestions) {
+    const sliders = (allQuestions || []).filter((q) => q.type === 'slider')
+    const flagged = sliders.filter((q) => q.config?.use_for_color)
+    if (flagged.length) {
+      state.globalColorQuestions = flagged
+    } else {
+      const wellbeing = sliders.find((q) => q.key === 'wellbeing')
+      state.globalColorQuestions = wellbeing ? [wellbeing] : sliders.slice(0, 1)
+    }
   }
 
   // ── Pins loading / rendering ────────────────────────────────

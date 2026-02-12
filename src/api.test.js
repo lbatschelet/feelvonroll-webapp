@@ -100,7 +100,7 @@ describe('api', () => {
 
     const result = await fetchLanguages()
 
-    expect(fetch).toHaveBeenCalledWith(`${API_BASE}/languages.php`)
+    expect(fetch).toHaveBeenCalledWith(`${API_BASE}/languages.php`, { cache: 'no-store' })
     expect(result).toEqual([{ lang: 'de', label: 'Deutsch' }])
   })
 })
