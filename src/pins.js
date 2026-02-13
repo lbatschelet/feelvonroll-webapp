@@ -99,6 +99,59 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     colorMode.updatePreviewColor()
   })
 
+  // ── Camera pan to reveal pin behind modal ───────────────────
+  let panTween = null
+
+  function panToRevealPin(position3D) {
+    // Cancel any running pan
+    if (panTween !== null) {
+      cancelAnimationFrame(panTween)
+      panTween = null
+    }
+
+    // Project pin position to normalized device coordinates
+    const projected = position3D.clone().project(camera)
+    // projected.y: +1 = top of screen, -1 = bottom, 0 = center
+    // We want the pin in the upper quarter (y ≈ +0.5) so it sits above the modal
+    const targetNDC_Y = 0.5
+    const deltaY = targetNDC_Y - projected.y
+
+    // If the pin is already in the upper third, no need to pan
+    if (projected.y > 0.3) return
+
+    // Convert NDC delta to a world-space offset.
+    // For a perspective camera, we can approximate the pan amount:
+    // unproject two NDC points at the pin's depth and measure the difference.
+    const ndcA = new THREE.Vector3(0, 0, projected.z).unproject(camera)
+    const ndcB = new THREE.Vector3(0, deltaY, projected.z).unproject(camera)
+    const worldDelta = ndcB.clone().sub(ndcA)
+
+    // Animate the pan over ~300ms
+    const duration = 300
+    const startTarget = controls.target.clone()
+    const startCamPos = camera.position.clone()
+    const startTime = performance.now()
+
+    function animate(now) {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // Ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+
+      controls.target.copy(startTarget).addScaledVector(worldDelta, eased)
+      camera.position.copy(startCamPos).addScaledVector(worldDelta, eased)
+      controls.update()
+
+      if (progress < 1) {
+        panTween = requestAnimationFrame(animate)
+      } else {
+        panTween = null
+      }
+    }
+
+    panTween = requestAnimationFrame(animate)
+  }
+
   // ── Raycasting ──────────────────────────────────────────────
   setupPinRaycaster({
     camera,
@@ -109,6 +162,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     onPinClick: (pin) => openForm({ pin }),
     onFloorClick: ({ floorIndex, position }) => {
       placePendingPin({ floorIndex, position })
+      panToRevealPin(position)
       openForm({ floorIndex, position })
     },
   })
@@ -121,6 +175,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     controls,
     onFloorClick: ({ floorIndex, position }) => {
       placePendingPin({ floorIndex, position })
+      panToRevealPin(position)
       openForm({ floorIndex, position })
     },
   })
