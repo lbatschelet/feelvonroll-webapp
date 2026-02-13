@@ -11,6 +11,7 @@ import { createPinMesh, createClusterMesh } from './pins/pinMesh'
 import { buildClusters } from './pins/pinClustering'
 import { createPinUi } from './pins/pinPanel'
 import { setupPinRaycaster } from './pins/pinRaycaster'
+import { setupLongPress } from './pins/pinLongPress'
 import { createPinState, normalizePin, isLocalPin, bySort, getOptionLabel } from './pins/pinState'
 import { createPinColorMode } from './pins/pinColorMode'
 import { applyStaticTranslations, applyQuestionLabels, refreshViewTexts } from './pins/pinTranslations'
@@ -106,6 +107,18 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
     getState: () => state,
     getSelectedFloor,
     onPinClick: (pin) => openForm({ pin }),
+    onFloorClick: ({ floorIndex, position }) => {
+      placePendingPin({ floorIndex, position })
+      openForm({ floorIndex, position })
+    },
+  })
+
+  setupLongPress({
+    camera,
+    domElement,
+    getState: () => state,
+    getSelectedFloor,
+    controls,
     onFloorClick: ({ floorIndex, position }) => {
       placePendingPin({ floorIndex, position })
       openForm({ floorIndex, position })
@@ -383,6 +396,7 @@ export function createPinSystem({ scene, camera, domElement, controls, getSelect
 
   function closeForm() {
     backdrop.classList.remove('is-visible')
+    backdrop.classList.remove('is-longpress')
     form.dataset.floorIndex = ''
     form.dataset.x = ''
     form.dataset.y = ''
