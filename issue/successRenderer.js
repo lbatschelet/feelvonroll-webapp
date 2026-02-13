@@ -4,17 +4,16 @@
  *
  * Exports: renderSuccess.
  */
-import { escapeHtml } from './escapeHtml'
 
 /**
  * Replace the card content with a success message.
  *
  * @param {HTMLElement} cardElement — the `.issue-card` element
  * @param {object} options
- * @param {string}   options.issueUrl — URL of the created GitHub issue
- * @param {() => void} options.onSubmitAnother — called when user clicks "Submit another"
+ * @param {(key: string) => string} options.t — translation function
+ * @param {() => void} options.onSubmitAnother
  */
-export function renderSuccess(cardElement, { issueUrl, onSubmitAnother }) {
+export function renderSuccess(cardElement, { t, onSubmitAnother }) {
   cardElement.innerHTML = `
     <div class="issue-success">
       <div class="success-icon">
@@ -23,14 +22,9 @@ export function renderSuccess(cardElement, { issueUrl, onSubmitAnother }) {
           <polyline points="20 6 9 17 4 12"/>
         </svg>
       </div>
-      <h2>Thank you!</h2>
-      <p>Your submission has been received and a GitHub issue has been created.</p>
-      ${
-        issueUrl
-          ? `<p><a href="${escapeHtml(issueUrl)}" target="_blank" rel="noopener">View issue on GitHub &rarr;</a></p>`
-          : ''
-      }
-      <p style="margin-top:1rem"><a href="#" id="submitAnother">Submit another</a></p>
+      <h2>${t('success.title')}</h2>
+      <p>${t('success.message')}</p>
+      <p style="margin-top:1rem"><a href="#" id="submitAnother">${t('success.another')}</a></p>
     </div>
   `
 

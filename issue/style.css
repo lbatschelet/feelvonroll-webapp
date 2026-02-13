@@ -26,38 +26,84 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem 3rem;
+  padding: 0 1rem 2rem;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Nav bar (logo + lang switcher) ────────── */
+
+.issue-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 1.25rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.issue-logo {
+  font-size: 1.15rem;
+  text-decoration: none;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+.issue-logo em {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.issue-logo strong {
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* ── Language toggle ───────────────────────── */
+
+.lang-toggle {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #9ca3af;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.lang-toggle:hover {
+  color: #374151;
 }
 
 /* ── Header ────────────────────────────────── */
 
 .issue-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  max-width: 560px;
+  text-align: left;
+  margin-bottom: 1.5rem;
   width: 100%;
 }
 
 .issue-header h1 {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   margin-bottom: 0.25rem;
   color: #111827;
 }
 
-.issue-header h1 em {
+.issue-header p {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.issue-header p em {
   font-style: italic;
   font-weight: 400;
 }
 
-.issue-header h1 strong {
+.issue-header p strong {
   font-weight: 700;
   font-style: normal;
-}
-
-.issue-header p {
-  color: #6b7280;
-  font-size: 0.9rem;
 }
 
 /* ── Card ──────────────────────────────────── */
@@ -67,7 +113,6 @@ body {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 1.75rem;
-  max-width: 560px;
   width: 100%;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
@@ -213,7 +258,16 @@ body {
   background: #4f46e5;
   color: #ffffff;
   transition: background 0.15s, opacity 0.15s;
-  align-self: flex-start;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.submit-btn .send-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 .submit-btn:hover {
@@ -228,6 +282,10 @@ body {
 .submit-btn.loading {
   position: relative;
   color: transparent;
+}
+
+.submit-btn.loading .send-icon {
+  visibility: hidden;
 }
 
 .submit-btn.loading::after {
@@ -302,53 +360,67 @@ body {
   padding: 0.6rem 0.85rem;
 }
 
-/* ── Footer ────────────────────────────────── */
+/* ── Footer (admin-style) ──────────────────── */
 
-.issue-footer {
-  text-align: center;
-  margin-top: 1.5rem;
-  max-width: 560px;
+.app-footer {
   width: 100%;
-}
-
-.issue-footer a {
-  font-size: 0.8rem;
-  color: #6b7280;
-  text-decoration: none;
-  display: inline-flex;
+  margin-top: auto;
+  padding: 2rem 0 1rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.35rem;
-  transition: color 0.15s;
+  font-size: 0.8rem;
+  color: #94a3b8;
 }
 
-.issue-footer a:hover {
+.app-footer a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
   color: #4f46e5;
 }
 
-.issue-footer svg {
+.footer-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.footer-credit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.footer-phbern {
+  white-space: nowrap;
+}
+
+.footer-license {
+  font-size: 0.75rem;
+}
+
+.footer-bug {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.footer-bug svg {
   width: 14px;
   height: 14px;
-}
-
-.issue-back {
-  margin-top: 0.5rem;
-}
-
-.issue-back a {
-  font-size: 0.8rem;
-  color: #9ca3af;
-  text-decoration: none;
-}
-
-.issue-back a:hover {
-  color: #6b7280;
 }
 
 /* ── Responsive ────────────────────────────── */
 
 @media (max-width: 480px) {
   #app {
-    padding: 1.25rem 0.75rem 2rem;
+    padding: 0 0.75rem 1.5rem;
   }
 
   .issue-card {
@@ -356,6 +428,16 @@ body {
   }
 
   .issue-header h1 {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
+  }
+
+  .app-footer {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .footer-credit {
+    justify-content: center;
   }
 }
