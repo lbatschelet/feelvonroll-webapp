@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 
 export const VIEW = {
-  background: 0xf3f4f6,
+  // CSS-style string so THREE.Color applies proper sRGB→linear conversion,
+  // keeping the canvas background identical to the CSS background.
+  background: '#f3f4f6',
   cameraPosition: new THREE.Vector3(-14, 16, 14),
   polarAngle: THREE.MathUtils.degToRad(50),
   minDistance: 6,

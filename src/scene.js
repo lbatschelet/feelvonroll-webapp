@@ -3,17 +3,22 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { VIEW } from './config'
 
 export function createRenderer(app) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true })
+  // alpha: true makes the canvas transparent so the CSS background-color
+  // (#f3f4f6 on #app / body) shows through.  This guarantees the canvas
+  // background is pixel-identical to the CSS color that Safari also uses
+  // for toolbar tinting — eliminating the visible seam between the
+  // browser chrome and the WebGL content.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(app.clientWidth, app.clientHeight)
-  renderer.setClearColor(VIEW.background, 1)
+  renderer.setClearColor(0x000000, 0) // fully transparent clear
   app.appendChild(renderer.domElement)
   return renderer
 }
 
 export function createScene() {
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(VIEW.background)
+  // No scene.background → transparent, CSS background shows through
   return scene
 }
 

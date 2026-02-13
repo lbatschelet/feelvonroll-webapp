@@ -16,24 +16,41 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* 100% statt 100vh — das klassische iOS-Problem: 100vh ist auf iOS
+     die "large viewport" Höhe (Toolbar eingeklappt), was grösser ist
+     als der sichtbare Bereich.  100% = tatsächlich sichtbarer Viewport. */
   width: 100%;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   background: #f3f4f6;
   touch-action: none;
 }
 
 #app {
+  /* inset:0 sizes #app to the *visible* viewport so UI elements
+     (buttons, panels) stay above Safari's toolbar.  The canvas
+     independently covers the full screen via 100vh below. */
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Safari 15-25 uses <meta name="theme-color"> for toolbar tinting.
+     Safari 26+ derives it from the background-color of fixed elements
+     near the top/bottom edges.  Without this, #app is transparent and
+     Safari falls back to a default white/gray tint — the visible "bars".
+     Setting it to the scene background makes the toolbars blend in. */
+  background-color: #f3f4f6;
 }
 
 canvas {
   display: block;
+  /* Must be position:absolute (not fixed!) so Safari's tab-bar tinting
+     reads #app's background-color instead of the canvas's (transparent). */
   position: absolute;
   top: 0;
   left: 0;
@@ -195,9 +212,51 @@ canvas {
   cursor: crosshair;
 }
 
+/* ── Long-press ripple (mobile pin creation) ──────────── */
+
+.longpress-ripple {
+  position: fixed;
+  pointer-events: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  transform: translate(-50%, -50%) scale(0);
+  animation: longpress-expand 600ms ease-out forwards;
+  z-index: 5;
+}
+
+@keyframes longpress-expand {
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+/* ── Long-press modal grow animation ─────────────────── */
+
+.ui-modal-backdrop.is-longpress .ui-modal {
+  animation: modal-grow 250ms cubic-bezier(0.2, 0, 0, 1) forwards;
+  transform-origin: var(--longpress-x, 50%) var(--longpress-y, 50%);
+}
+
+@keyframes modal-grow {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .ui-modal-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: none;
   align-items: center;
   justify-content: center;
@@ -215,7 +274,7 @@ canvas {
   border-radius: 16px;
   padding: 0;
   width: min(90vw, 360px);
-  max-height: min(85vh, 600px);
+  max-height: min(85%, 600px);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
   display: flex;
   flex-direction: column;
@@ -230,6 +289,8 @@ canvas {
   font-size: 0.85rem;
   padding: 28px 18px 18px;
   overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -268,6 +329,7 @@ canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  z-index: 1;
 }
 
 .ui-modal-close svg {
