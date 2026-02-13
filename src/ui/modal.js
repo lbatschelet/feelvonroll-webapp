@@ -30,5 +30,26 @@ export function createModal() {
 
   document.body.appendChild(backdrop)
 
+  // Constrain the backdrop to the visible area when the virtual keyboard opens.
+  // With interactive-widget=overlays-content the page doesn't resize,
+  // so we use visualViewport to shrink only the backdrop while #app stays put.
+  if (window.visualViewport) {
+    const fullHeight = window.innerHeight
+    const syncToViewport = () => {
+      const vv = window.visualViewport
+      const keyboardOpen = vv.height < fullHeight * 0.85
+      if (keyboardOpen) {
+        backdrop.style.height = vv.height + 'px'
+        backdrop.style.top = vv.offsetTop + 'px'
+      } else {
+        // Keyboard closed — reset to full viewport
+        backdrop.style.height = ''
+        backdrop.style.top = ''
+      }
+    }
+    window.visualViewport.addEventListener('resize', syncToViewport)
+    window.visualViewport.addEventListener('scroll', syncToViewport)
+  }
+
   return { backdrop, modal, closeButton }
 }
