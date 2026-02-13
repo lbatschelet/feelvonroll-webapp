@@ -30,21 +30,64 @@ export function createModal() {
 
   document.body.appendChild(backdrop)
 
-  // Constrain the backdrop to the visible area when the virtual keyboard opens.
-  // With interactive-widget=overlays-content the page doesn't resize,
-  // so we use visualViewport to shrink only the backdrop while #app stays put.
+  // ── iOS Safari keyboard fix ──────────────────────────────────────
+  // iOS Safari does NOT support interactive-widget=overlays-content.
+  // When the virtual keyboard opens it scrolls the page, displacing
+  // fixed-position elements.  We counter this by:
+  //   1. Forcing window.scrollTo(0,0) whenever the modal is visible
+  //   2. Keeping the backdrop full-screen (so the dark overlay always
+  //      covers the entire screen) and only repositioning the modal
+  //      to fit above the keyboard
+  //   3. Resetting scroll after input focus (iOS auto-scrolls on focus)
+
+  let isVisible = false
+
+  // Track visibility via class changes
+  const observer = new MutationObserver(() => {
+    const nowVisible = backdrop.classList.contains('is-visible')
+    if (nowVisible && !isVisible) {
+      isVisible = true
+    } else if (!nowVisible && isVisible) {
+      isVisible = false
+      window.scrollTo(0, 0)
+      // Reset modal adjustments
+      modal.style.maxHeight = ''
+      backdrop.style.alignItems = ''
+      backdrop.style.paddingTop = ''
+    }
+  })
+  observer.observe(backdrop, { attributes: true, attributeFilter: ['class'] })
+
+  // Prevent iOS from keeping the page scrolled when keyboard opens
+  window.addEventListener('scroll', () => {
+    if (isVisible) window.scrollTo(0, 0)
+  }, { passive: true })
+
+  // After iOS auto-scrolls to a focused input, immediately reset
+  backdrop.addEventListener('focusin', () => {
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0)
+    })
+  })
+
+  // Keep backdrop full-screen; reposition the modal within it when
+  // the virtual keyboard is present so it fits in the visible area.
   if (window.visualViewport) {
-    const fullHeight = window.innerHeight
     const syncToViewport = () => {
+      if (!isVisible) return
       const vv = window.visualViewport
-      const keyboardOpen = vv.height < fullHeight * 0.85
+      const keyboardOpen = vv.height < window.innerHeight * 0.85
       if (keyboardOpen) {
-        backdrop.style.height = vv.height + 'px'
-        backdrop.style.top = vv.offsetTop + 'px'
+        window.scrollTo(0, 0)
+        // Constrain modal height to visible area (minus padding)
+        modal.style.maxHeight = (vv.height - 32) + 'px'
+        // Align to the top so the modal stays above the keyboard
+        backdrop.style.alignItems = 'flex-start'
+        backdrop.style.paddingTop = Math.max(0, vv.offsetTop + 16) + 'px'
       } else {
-        // Keyboard closed — reset to full viewport
-        backdrop.style.height = ''
-        backdrop.style.top = ''
+        modal.style.maxHeight = ''
+        backdrop.style.alignItems = ''
+        backdrop.style.paddingTop = ''
       }
     }
     window.visualViewport.addEventListener('resize', syncToViewport)
