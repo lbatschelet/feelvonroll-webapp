@@ -15,6 +15,8 @@
  *   - 'gltf': (future) loads a glTF model
  */
 import { createProceduralBuilding } from './proceduralBuilding'
+import { createGltfBuilding } from './gltfBuilding'
+import { createStackedGltfBuilding } from './gltfBuilding'
 
 /**
  * Creates a building provider.
@@ -22,12 +24,15 @@ import { createProceduralBuilding } from './proceduralBuilding'
  * @param {string} [type='procedural'] - Provider type.
  * @returns {object} Building provider conforming to the interface above.
  */
-export function createBuildingProvider(scene, type = 'procedural') {
+export async function createBuildingProvider(scene, type = 'procedural', options = {}) {
   switch (type) {
     case 'procedural':
       return createProceduralBuilding(scene)
-    // case 'gltf':
-    //   return createGltfBuilding(scene, modelUrl)
+    case 'gltf':
+      if (options?.modelUrlsByFloorIndex) {
+        return createStackedGltfBuilding(scene, options)
+      }
+      return createGltfBuilding(scene, options)
     default:
       throw new Error(`Unknown building provider type: ${type}`)
   }

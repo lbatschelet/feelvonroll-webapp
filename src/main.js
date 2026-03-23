@@ -3,6 +3,7 @@
  * Wires together scene, building, pin system, and UI.
  */
 import './style.css'
+import * as THREE from 'three'
 import {
   addLights,
   createCamera,
@@ -26,6 +27,8 @@ import { marked } from 'marked'
 const urlParams = new URLSearchParams(window.location.search)
 const captureMode = urlParams.get('mode') === 'capture'
 const stationKey = urlParams.get('station')
+const debugFloors = urlParams.get('debugFloors') === '1'
+const debugFloorVisibility = urlParams.get('debugFloorVisibility') === '1'
 
 
 // ── Scene setup ─────────────────────────────────────────────
@@ -41,16 +44,127 @@ scene.add(ground)
 addLights(scene)
 
 // ── Building ────────────────────────────────────────────────
-const building = createBuildingProvider(scene, 'procedural')
+// Prototype model loading:
+// If `/models/floor_0.glb` exists, we try to load it. Otherwise we fall back
+// to the procedural building provider so the app still runs.
+const BUILDING_MODEL_URL = '/models/floor_0.glb'
+let building
+try {
+  // Stacked prototype:
+  // expects per-floor exports like:
+  // - /models/floor_-1.glb
+  // - /models/floor_0.glb
+  // - /models/floor_1.glb
+  // If only a subset exists, the loader skips missing files.
+  building = await createBuildingProvider(scene, 'gltf', {
+    modelUrlsByFloorIndex: {
+      [-1]: '/models/floor_-1.glb',
+      [0]: BUILDING_MODEL_URL,
+      [1]: '/models/floor_1.glb',
+    },
+  })
+} catch {
+  building = await createBuildingProvider(scene, 'procedural')
+}
+
+// If the loaded model is huge (e.g. meter-calibrated Sweet Home exports),
+// expand camera range so the geometry isn't clipped.
+if (building?.suggestedCameraDistance) {
+  controls.maxDistance = building.suggestedCameraDistance
+  if (typeof building.suggestedCameraFar === 'number') {
+    camera.far = building.suggestedCameraFar
+  } else {
+    camera.far = building.suggestedCameraDistance * 6
+  }
+  camera.updateProjectionMatrix()
+}
+
+// Keep the ground visible for large models (provides an interaction
+// reference / background). It's already slightly offset below Y=0 in
+// scene.js to reduce z-fighting.
+
+// Adjust zoom bounds for huge imported models:
+// - keep the default "from the other corner" view
+// - but allow zooming closer than the procedural defaults
+if (building?.suggestedCameraDistance) {
+  controls.minDistance = Math.min(controls.minDistance, Math.max(0.5, building.suggestedCameraDistance * 0.05))
+  controls.maxDistance = Math.max(controls.maxDistance, building.suggestedCameraDistance * 6)
+
+  // Keep clipping planes wide enough so parts don't disappear while zooming.
+  camera.near = 0.01
+  camera.far = typeof building.suggestedCameraFar === 'number' ? building.suggestedCameraFar : building.suggestedCameraDistance * 10
+  camera.updateProjectionMatrix()
+
+  // If we're currently zoomed in too much on load (trackpad gestures
+  // / initial model alignment), only ever push the camera further away
+  // to the suggested distance. This avoids "jumping out" during normal use.
+  const target = controls.target.clone()
+  const dir = camera.position.clone().sub(target)
+  const currentDist = dir.length()
+  if (currentDist > 1e-6) {
+    const nextDist = Math.max(currentDist, building.suggestedCameraDistance)
+    dir.normalize()
+    camera.position.copy(target.add(dir.multiplyScalar(nextDist)))
+    controls.update()
+  }
+
+  controls.update()
+}
+
+// Resize the ground plane to cover the full imported model bounds,
+// so you don't see an edge "cut-off" while moving/zooming.
+if (building?.source === 'gltf' && typeof building?.suggestedGroundSize === 'number') {
+  ground.scale.set(building.suggestedGroundSize, building.suggestedGroundSize, 1)
+  // Move it away from the model to avoid z-fighting / overlap artifacts.
+  ground.position.y = -10
+  // Make the ground faint (still provides reference for "keep distance").
+  ground.material.transparent = true
+  ground.material.opacity = 0.25
+  ground.material.depthWrite = false
+}
+
+// Optional rotate buttons (helps when trackpad gesture mapping is unclear).
+// Uses OrbitControls' internal rotate delta.
+const rotateOverlay = document.createElement('div')
+rotateOverlay.className = 'ui-view-controls'
+rotateOverlay.innerHTML = `
+  <div class="ui-view-controls-inner">
+    <button type="button" class="ui-view-controls-btn" data-rot="-1" title="Rotate left"><span class="ui-view-controls-icon">↺</span></button>
+    <button type="button" class="ui-view-controls-btn" data-rot="1" title="Rotate right"><span class="ui-view-controls-icon">↻</span></button>
+  </div>
+`
+
+const rotButtons = rotateOverlay.querySelectorAll('button[data-rot]')
+rotButtons.forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault()
+    const dir = Number(btn.dataset.rot || 0)
+    if (dir === 0) return
+    if (typeof controls._rotateLeft === 'function') {
+      controls._rotateLeft(dir * Math.PI / 18)
+      controls.update()
+    }
+  })
+})
 
 // ── Floor selector ──────────────────────────────────────────
 let selectedFloor = 0
-let currentTargetY = building.getTargetYForFloor(selectedFloor)
+let currentTargetY = (building?.source === 'gltf')
+  ? controls.target.y
+  : building.getTargetYForFloor(selectedFloor)
+
+// OrbitControls pan in perspective mode scales with camera-target distance.
+// We counter-balance that so panning feels more consistent across zoom levels.
+const PAN_REFERENCE_DISTANCE = Math.max(1, camera.position.distanceTo(controls.target))
+const PAN_REFERENCE_SPEED = controls.panSpeed
+const PAN_SPEED_MIN = 0.25
+const PAN_SPEED_MAX = 4.0
 
 const { floorButtons, ui: floorSelectorUi } = createFloorSelector(
   building.maxBasements,
   building.maxAboveGroundFloors
 )
+floorSelectorUi.prepend(rotateOverlay)
 app.appendChild(floorSelectorUi)
 
 // ── Title bar ────────────────────────────────────────────────
@@ -289,13 +403,31 @@ async function bootStationMode(key) {
 
 // ── Floor visibility ────────────────────────────────────────
 function setGroupOpacity(group, opacity) {
+  const isGhost = opacity < 0.999
+  // Ensure consistent drawing order for blended floors.
+  // - active floor: renderOrder 1
+  // - ghost floors: renderOrder 2
+  group.renderOrder = isGhost ? 2 : 1
   group.traverse((child) => {
     if (child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material]
       materials.forEach((material) => {
-        material.transparent = true
+        material.transparent = isGhost
         material.opacity = opacity
+        if ('depthWrite' in material) material.depthWrite = !isGhost
+        // Keep depth testing enabled so ghosts don't "snap" to the top.
+        if ('depthTest' in material) material.depthTest = true
+
+        if ('polygonOffset' in material) {
+          material.polygonOffset = isGhost
+          material.polygonOffsetFactor = isGhost ? 1 : 0
+          material.polygonOffsetUnits = isGhost ? 1 : 0
+        }
+        material.needsUpdate = true
       })
+    }
+    if (child.isMesh) {
+      child.renderOrder = isGhost ? 2 : 1
     }
   })
 }
@@ -303,7 +435,15 @@ function setGroupOpacity(group, opacity) {
 function updateFloorVisibility() {
   building.floorGroups.forEach((group) => {
     const floorIndex = group.userData.floorIndex
+    // Rule:
+    // - Floors above the selected floor are hidden.
+    // - If the selected floor is above ground (> 0), basements (< 0) must not be visible.
+    // - Otherwise: floors below the selected floor remain visible as "ghosts" (semi-transparent).
     if (floorIndex > selectedFloor) {
+      group.visible = false
+      return
+    }
+    if (selectedFloor >= 0 && floorIndex < 0) {
       group.visible = false
       return
     }
@@ -313,6 +453,7 @@ function updateFloorVisibility() {
       setGroupOpacity(group, 1)
     } else {
       building.setFloorWallMode(group, false)
+      // Ghost floors: visible hint under the active floor.
       setGroupOpacity(group, 0.35)
     }
   })
@@ -323,11 +464,54 @@ function updateFloorVisibility() {
 
   ground.visible = selectedFloor >= 0
   pinSystem.setActiveFloor(selectedFloor)
+
+  if (debugFloorVisibility) {
+    const snapshot = building.floorGroups
+      .map((g) => {
+        const floorIndex = g.userData.floorIndex
+        const visible = g.visible
+        let materialSample = null
+        let markerScreen = null
+        g.traverse((child) => {
+          if (materialSample) return
+          if (!child?.isMesh || !child.material) return
+          const m = Array.isArray(child.material) ? child.material[0] : child.material
+          if (!m) return
+          materialSample = {
+            transparent: m.transparent,
+            opacity: m.opacity,
+            depthWrite: m.depthWrite,
+            depthTest: m.depthTest,
+          }
+        })
+
+        // Project the per-floor debug marker (if present) to see whether
+        // stacked floors are actually separated on screen.
+        g.traverse((child) => {
+          if (markerScreen) return
+          if (!child?.isMesh) return
+          if (child.name !== `floorMarker_${floorIndex}`) return
+          const v = new THREE.Vector3()
+          child.getWorldPosition(v)
+          const ndc = v.clone().project(camera)
+          markerScreen = { worldY: v.y, ndcY: ndc.y }
+        })
+        return { floorIndex, visible, materialSample, groupY: g.position.y, markerScreen }
+      })
+      .sort((a, b) => Number(a.floorIndex) - Number(b.floorIndex))
+    console.log('[floorVisibility]', JSON.stringify({ selectedFloor, snapshot }))
+  }
 }
 
 function setSelectedFloor(nextIndex) {
   selectedFloor = nextIndex
-  currentTargetY = building.getTargetYForFloor(selectedFloor)
+  // For glTF prototypes we keep the camera target Y stable across floor
+  // switches. Otherwise the camera follows the active floor and the ghost
+  // layer can end up visually coincident, making floors 0 and 1 look
+  // identical.
+  if (building?.source !== 'gltf') {
+    currentTargetY = building.getTargetYForFloor(selectedFloor)
+  }
   updateFloorVisibility()
 }
 
@@ -344,13 +528,20 @@ function handleResize() {
 function animate() {
   requestAnimationFrame(animate)
 
+  // Adaptive pan speed: zoom-in shouldn't feel "stuck", zoom-out shouldn't jump.
+  const camDistance = Math.max(0.001, camera.position.distanceTo(controls.target))
+  const adaptivePanSpeed = PAN_REFERENCE_SPEED * (PAN_REFERENCE_DISTANCE / camDistance)
+  controls.panSpeed = Math.min(PAN_SPEED_MAX, Math.max(PAN_SPEED_MIN, adaptivePanSpeed))
+
   controls.update()
 
   // Floor-level Y-forcing: keep camera and target locked to the active floor
-  const deltaY = currentTargetY - controls.target.y
-  if (Math.abs(deltaY) > 1e-6) {
-    controls.target.y += deltaY
-    camera.position.y += deltaY
+  if (building?.source !== 'gltf') {
+    const deltaY = currentTargetY - controls.target.y
+    if (Math.abs(deltaY) > 1e-6) {
+      controls.target.y += deltaY
+      camera.position.y += deltaY
+    }
   }
 
   pinSystem.update()

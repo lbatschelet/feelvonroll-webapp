@@ -8,7 +8,12 @@ export function createRenderer(app) {
   // background is pixel-identical to the CSS color that Safari also uses
   // for toolbar tinting — eliminating the visible seam between the
   // browser chrome and the WebGL content.
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    // Helps with depth precision issues when models are large (e.g. meters-scale campus).
+    logarithmicDepthBuffer: true,
+  })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(app.clientWidth, app.clientHeight)
   renderer.setClearColor(0x000000, 0) // fully transparent clear
@@ -35,27 +40,32 @@ export function createControls(camera, domElement) {
   controls.panSpeed = 1.2
   controls.enablePan = true
   controls.enableZoom = true
-  controls.enableRotate = false
-  controls.screenSpacePanning = true
+  controls.enableRotate = true
+  // Keep panning parallel to the ground plane (XZ) instead of screen space.
+  // This avoids the "pull camera away when dragging up/down" effect.
+  controls.screenSpacePanning = false
   controls.minDistance = VIEW.minDistance
   controls.maxDistance = VIEW.maxDistance
   controls.target.set(0, 3, 0)
   controls.update()
   controls.mouseButtons = {
+    // Trackpad/mouse:
+    // - one finger / drag gesture -> pan (move)
+    // - right mouse button -> rotate
     LEFT: THREE.MOUSE.PAN,
     MIDDLE: THREE.MOUSE.DOLLY,
-    RIGHT: THREE.MOUSE.PAN,
+    RIGHT: THREE.MOUSE.ROTATE,
   }
   controls.touches = {
+    // Touchscreen:
+    // - one finger drag -> pan
+    // - two fingers drag -> rotate (+ dolly on pinch if available)
     ONE: THREE.TOUCH.PAN,
-    TWO: THREE.TOUCH.DOLLY_PAN,
+    TWO: THREE.TOUCH.DOLLY_ROTATE,
   }
 
   controls.minPolarAngle = VIEW.polarAngle
   controls.maxPolarAngle = VIEW.polarAngle
-  const fixedAzimuth = controls.getAzimuthalAngle()
-  controls.minAzimuthAngle = fixedAzimuth
-  controls.maxAzimuthAngle = fixedAzimuth
   return controls
 }
 
@@ -68,10 +78,13 @@ export function addLights(scene) {
 
 export function createGround() {
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(50, 50),
+    new THREE.PlaneGeometry(1, 1),
     new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.9 })
   )
   mesh.rotation.x = -Math.PI / 2
-  mesh.position.y = 0
+  // Slightly below Y=0 to reduce z-fighting with exported floor geometry.
+  mesh.position.y = -0.02
+  // Default size (will be resized for glTF models).
+  mesh.scale.set(2000, 2000, 1)
   return mesh
 }

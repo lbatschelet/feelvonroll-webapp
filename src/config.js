@@ -4,7 +4,8 @@ export const VIEW = {
   // CSS-style string so THREE.Color applies proper sRGB→linear conversion,
   // keeping the canvas background identical to the CSS background.
   background: '#f3f4f6',
-  cameraPosition: new THREE.Vector3(-14, 16, 14),
+  // Default: camera from the opposite corner than before.
+  cameraPosition: new THREE.Vector3(14, 16, -14),
   polarAngle: THREE.MathUtils.degToRad(50),
   minDistance: 6,
   maxDistance: 40,
