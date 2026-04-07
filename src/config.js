@@ -30,7 +30,8 @@ export const ORBIT_FEEL = {
  *
  *  closestZoom  —  Wie NAH darf die Kamera maximal zum Zielpunkt (Orbit-Zentrum)?
  *                 minDistance = D × closestZoom, eingegrenzt nur relativ zu D (kein festes „75“).
- *                 Kleiner = näher reinzoomen. Zum Testen: Mausrad nach vorn bis zum Anschlag.
+ *                 Merke: kleinere Zahl = ein Stück näher reinzoomen (z. B. 0.10 etwas näher als 0.11).
+ *                 Zum Testen: Mausrad nach vorn bis zum Anschlag.
  *
  *  farthestZoom —  Wie WEIT darf die Kamera maximal weg?
  *                 maxDistance hängt von D × farthestZoom ab (plus kleine Sicherheit).
@@ -38,7 +39,7 @@ export const ORBIT_FEEL = {
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const ORBIT_GLTF_ZOOM = {
-  closestZoom: 0.11,
+  closestZoom: 0.105,
   farthestZoom: 1,
 
   /** Relativ zu D — verhindert nur Extremfälle; vorher haben feste 4…75 closestZoom oft ignoriert */
