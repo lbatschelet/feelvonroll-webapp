@@ -20,6 +20,7 @@ import { createTitleBar } from './ui/titleBar'
 import { createPinSystem } from './pins'
 import { fetchLanguages, fetchQuestions, fetchContent, fetchStation, fetchQuestionnaire } from './api'
 import { getFallbackQuestions } from './questionnaire'
+import { ORBIT_GLTF_ZOOM } from './config'
 import { getLanguage, onLanguageChange, setLanguage, t } from './i18n'
 import { marked } from 'marked'
 
@@ -79,8 +80,17 @@ function applyImportedModelCameraLimits(b) {
   const D = b?.suggestedCameraDistance
   if (!D || !Number.isFinite(D)) return
 
-  const minDist = THREE.MathUtils.clamp(D * 0.08, 3, 60)
-  const maxDist = Math.max(D * 6, minDist * 5, 120)
+  const z = ORBIT_GLTF_ZOOM
+  const minDist = THREE.MathUtils.clamp(
+    D * z.minDistMult,
+    z.minDistClampMin,
+    z.minDistClampMax
+  )
+  const maxDist = Math.max(
+    D * z.maxDistMult,
+    minDist * z.maxDistMinOverMin,
+    z.maxDistFloor
+  )
 
   controls.minDistance = minDist
   controls.maxDistance = maxDist
@@ -96,11 +106,19 @@ function applyImportedModelCameraLimits(b) {
   const dist = cp.distanceTo(target)
   if (dist < 1e-6) return
   const dir = new THREE.Vector3().subVectors(cp, target).normalize()
-  if (dist < minDist) {
-    cp.copy(target.clone().addScaledVector(dir, minDist))
-  } else if (dist > maxDist) {
-    cp.copy(target.clone().addScaledVector(dir, maxDist))
-  }
+
+  let desired = dist
+  if (desired < minDist) desired = minDist
+  if (desired > maxDist) desired = maxDist
+
+  const desiredStart = THREE.MathUtils.clamp(
+    D * z.defaultViewMult,
+    minDist,
+    maxDist
+  )
+  if (desired < desiredStart) desired = desiredStart
+
+  cp.copy(target.clone().addScaledVector(dir, desired))
   controls.update()
 }
 

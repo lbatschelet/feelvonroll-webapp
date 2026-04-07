@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { VIEW } from './config'
+import { ORBIT_FEEL, VIEW } from './config'
 
 export function createRenderer(app) {
   // alpha: true makes the canvas transparent so the CSS background-color
@@ -36,8 +36,8 @@ export function createCamera() {
 export function createControls(camera, domElement) {
   const controls = new OrbitControls(camera, domElement)
   controls.enableDamping = true
-  controls.dampingFactor = 0.05
-  controls.zoomSpeed = 1
+  controls.dampingFactor = ORBIT_FEEL.dampingFactor
+  controls.zoomSpeed = ORBIT_FEEL.zoomSpeed
   controls.panSpeed = 1
   controls.enablePan = true
   controls.enableZoom = true

@@ -11,6 +11,44 @@ export const VIEW = {
   maxDistance: 40,
 }
 
+/**
+ * OrbitControls „Bremsen“ nach Loslassen (Pan/Rotate) und Zoom-Raster.
+ * Höheres dampingFactor = schnellerer Stillstand (Three.js Default 0.05).
+ * Niedrigeres zoomSpeed = weniger Zoom pro Rad-Impuls.
+ */
+export const ORBIT_FEEL = {
+  dampingFactor: 0.22,
+  zoomSpeed: 0.65,
+}
+
+/**
+ * Zoom-Grenzen für importierte glTF-Modelle (main.js → applyImportedModelCameraLimits).
+ * D = building.suggestedCameraDistance (aus Bounding-Box).
+ *
+ * ┌──────────────────────────────────────────────────────────────────────────┐
+ * │ ① NAH-GRENZE (stärkstes „Reinzoomen“) → OrbitControls.minDistance         │
+ * │    Größer = weiter weg vom Ziel am nächsten erlaubten Punkt               │
+ * └──────────────────────────────────────────────────────────────────────────┘
+ * minDistance = clamp(D * minDistMult, minDistClampMin, minDistClampMax)
+ *
+ * ┌──────────────────────────────────────────────────────────────────────────┐
+ * │ ② WEIT-GRENZE (stärkstes „Rauszoomen“) → OrbitControls.maxDistance        │
+ * │    Größer = mehr Überblick                                                │
+ * └──────────────────────────────────────────────────────────────────────────┘
+ * maxDistance = max(D * maxDistMult, minDistance * maxDistMinOverMin, maxDistFloor)
+ *
+ * Startansicht: mindestens D * defaultViewMult (wenn Kamera näher wäre, nach außen)
+ */
+export const ORBIT_GLTF_ZOOM = {
+  minDistMult: 0.11,
+  minDistClampMin: 4,
+  minDistClampMax: 75,
+  maxDistMult: 6.8,
+  maxDistMinOverMin: 5,
+  maxDistFloor: 140,
+  defaultViewMult: 1.12,
+}
+
 export const FLOOR = {
   width: 12,
   depth: 10,
