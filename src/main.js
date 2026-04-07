@@ -11,6 +11,7 @@ import {
   createGround,
   createRenderer,
   createScene,
+  getPreferredPixelRatio,
 } from './scene'
 import { createBuildingProvider } from './building/buildingProvider'
 import { createFloorSelector } from './ui/floorSelector'
@@ -611,7 +612,7 @@ function handleResize() {
   camera.aspect = w / h
   camera.updateProjectionMatrix()
   renderer.setSize(w, h)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(getPreferredPixelRatio())
 }
 
 function clampPanToNavigationBounds() {

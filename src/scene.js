@@ -2,6 +2,15 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { ORBIT_FEEL, VIEW } from './config'
 
+/** Touch-Geräte: niedrigere DPR-Decke für flüssigeres Rendering grosser Szenen */
+export function getPreferredPixelRatio() {
+  if (typeof window === 'undefined') return 2
+  const dpr = window.devicePixelRatio || 1
+  const coarse = window.matchMedia?.('(pointer: coarse)')?.matches === true
+  const cap = coarse ? 1.5 : 2
+  return Math.min(dpr, cap)
+}
+
 export function createRenderer(app) {
   // alpha: true makes the canvas transparent so the CSS background-color
   // (#f3f4f6 on #app / body) shows through.  This guarantees the canvas
@@ -11,10 +20,11 @@ export function createRenderer(app) {
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true,
+    powerPreference: 'high-performance',
     // Helps with depth precision issues when models are large (e.g. meters-scale campus).
     logarithmicDepthBuffer: true,
   })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(getPreferredPixelRatio())
   renderer.setSize(app.clientWidth, app.clientHeight)
   renderer.setClearColor(0x000000, 0) // fully transparent clear
   app.appendChild(renderer.domElement)

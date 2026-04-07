@@ -22,6 +22,15 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { FLOOR } from '../config'
 
+/** Nur bei sichtbaren Ausblendern: ?noFrustumCull=1 (Standard: Culling an = weniger Draw) */
+function disableFrustumCullForDebug(root) {
+  if (typeof window === 'undefined') return
+  if (new URLSearchParams(window.location.search).get('noFrustumCull') !== '1') return
+  root.traverse((obj) => {
+    if (obj && obj.isMesh) obj.frustumCulled = false
+  })
+}
+
 function getFloorIndexFromName(name) {
   const match = /^floor_(-?\d+)$/.exec(name)
   if (!match) return null
@@ -119,11 +128,8 @@ export async function createGltfBuilding(scene, { modelUrl, debugSimulateFloors 
   const suggestedCameraDistance = Math.max(radius * 2.5, 40)
   const suggestedCameraFar = suggestedCameraDistance * 6
 
-  root.traverse((obj) => {
-    if (obj && obj.isMesh) obj.frustumCulled = false
-  })
-
   scene.add(root)
+  disableFrustumCullForDebug(root)
 
   // Collect floor groups by name.
   const floorEntries = []
@@ -249,15 +255,18 @@ export async function createStackedGltfBuilding(scene, { modelUrlsByFloorIndex }
   }
 
   const loader = new GLTFLoader()
-  const loaded = []
-  for (const entry of entries) {
-    try {
-      const gltf = await loader.loadAsync(entry.modelUrl)
-      loaded.push({ floorIndex: entry.floorIndex, gltf })
-    } catch {
-      // Skip missing floors (useful for partial exports).
-    }
-  }
+  const loaded = (
+    await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const gltf = await loader.loadAsync(entry.modelUrl)
+          return { floorIndex: entry.floorIndex, gltf }
+        } catch {
+          return null
+        }
+      })
+    )
+  ).filter(Boolean)
 
   if (!loaded.length) {
     throw new Error('No glTF floors could be loaded')
@@ -314,10 +323,7 @@ export async function createStackedGltfBuilding(scene, { modelUrlsByFloorIndex }
     // Stack by floor index relative to the chosen reference floor.
     root.position.y += (floorIndex - refIndex) * floorStepY
 
-    // Ensure frustum culling doesn't hide meshes (prototype).
-    root.traverse((obj) => {
-      if (obj && obj.isMesh) obj.frustumCulled = false
-    })
+    disableFrustumCullForDebug(root)
 
     // Create a per-floor group marker.
     root.userData.floorIndex = floorIndex
