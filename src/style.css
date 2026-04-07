@@ -365,6 +365,35 @@ canvas {
   margin-top: 4px;
 }
 
+.ui-form-influence {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.ui-influence-global-legend {
+  margin-bottom: 2px;
+}
+
+.ui-influence-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.ui-influence-slider-wrap {
+  padding-left: 2px;
+}
+
+.ui-influence-slider-wrap.is-collapsed {
+  display: none;
+}
+
 .ui-form-reasons {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

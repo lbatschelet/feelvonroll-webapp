@@ -84,6 +84,67 @@ export function renderQuestions(questions, formContent, questionElements) {
       elements = { ...elements, input }
     }
 
+    if (question.type === 'influence') {
+      const cfg = question.config || {}
+      const legend = document.createElement('div')
+      legend.className = 'ui-slider-legend ui-influence-global-legend'
+      const legendNeg = document.createElement('span')
+      legendNeg.className = 'ui-slider-legend-low'
+      legendNeg.textContent = question.legend_negative || ''
+      const legendPos = document.createElement('span')
+      legendPos.className = 'ui-slider-legend-high'
+      legendPos.textContent = question.legend_positive || ''
+      legend.appendChild(legendNeg)
+      legend.appendChild(legendPos)
+      group.appendChild(legend)
+
+      const wrap = document.createElement('div')
+      wrap.className = 'ui-form-influence'
+      const options = Array.isArray(question.options) ? question.options : []
+      const optionRows = []
+      options.forEach((option) => {
+        const row = document.createElement('div')
+        row.className = 'ui-influence-row'
+
+        const labelRow = document.createElement('label')
+        labelRow.className = 'ui-checkbox'
+        const checkbox = document.createElement('input')
+        checkbox.type = 'checkbox'
+        checkbox.dataset.optionKey = option.key
+        const text = document.createElement('span')
+        text.textContent = option.label || option.key
+        labelRow.appendChild(checkbox)
+        labelRow.appendChild(text)
+
+        const sliderWrap = document.createElement('div')
+        sliderWrap.className = 'ui-influence-slider-wrap is-collapsed'
+        const slider = document.createElement('input')
+        slider.type = 'range'
+        slider.min = cfg.min ?? -1
+        slider.max = cfg.max ?? 1
+        slider.step = cfg.step ?? 0.05
+        slider.value = String(getSliderDefault(cfg))
+        slider.disabled = true
+        sliderWrap.appendChild(slider)
+
+        checkbox.addEventListener('change', () => {
+          const on = checkbox.checked
+          sliderWrap.classList.toggle('is-collapsed', !on)
+          slider.disabled = !on
+          if (!on) {
+            slider.value = String(getSliderDefault(cfg))
+          }
+        })
+
+        row.appendChild(labelRow)
+        row.appendChild(sliderWrap)
+        wrap.appendChild(row)
+        optionRows.push({ key: option.key, checkbox, slider, sliderWrap, cfg })
+      })
+      group.appendChild(wrap)
+      elements = { ...elements, optionRows }
+    }
+
     formContent.appendChild(group)
     questionElements.set(question.key, elements)
   })
@@ -123,6 +184,18 @@ export function collectFormData(form, questions, questionElements) {
         .filter((item) => item.input.checked)
         .map((item) => item.input.value)
       answers[question.key] = allowMultiple ? selected : selected[0] || ''
+    }
+
+    if (question.type === 'influence') {
+      const out = {}
+      const rows = elements.optionRows || []
+      for (const row of rows) {
+        if (row.checkbox.checked) {
+          const v = Number(row.slider.value)
+          out[row.key] = Number.isFinite(v) ? Math.round(v * 10000) / 10000 : 0
+        }
+      }
+      answers[question.key] = out
     }
 
     if (question.required && isAnswerEmpty(answers[question.key])) {
@@ -169,6 +242,24 @@ export function setQuestionValue(key, value, questions, questionElements) {
     elements.input.value = value ?? ''
     return
   }
+  if (elements.optionRows && Array.isArray(elements.optionRows)) {
+    const obj = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+    elements.optionRows.forEach((row) => {
+      const v = obj[row.key]
+      const on = v !== undefined && v !== null
+      row.checkbox.checked = on
+      if (on) {
+        row.slider.value = String(v)
+        row.slider.disabled = false
+        row.sliderWrap.classList.remove('is-collapsed')
+      } else {
+        row.slider.value = String(getSliderDefault(row.cfg || {}))
+        row.slider.disabled = true
+        row.sliderWrap.classList.add('is-collapsed')
+      }
+    })
+    return
+  }
   if (Array.isArray(value)) {
     elements.inputs.forEach((item) => {
       item.input.checked = value.includes(item.input.value)
@@ -191,6 +282,10 @@ export function disableQuestions(disabled, questionElements) {
     elements.inputs?.forEach((item) => {
       item.input.disabled = disabled
     })
+    elements.optionRows?.forEach((row) => {
+      row.checkbox.disabled = disabled
+      row.slider.disabled = disabled || !row.checkbox.checked
+    })
   })
 }
 
@@ -211,6 +306,9 @@ export function isAnswerEmpty(value) {
   if (Array.isArray(value)) return value.length === 0
   if (value === null || value === undefined) return true
   if (typeof value === 'string') return value.trim().length === 0
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return Object.keys(value).length === 0
+  }
   return false
 }
 
