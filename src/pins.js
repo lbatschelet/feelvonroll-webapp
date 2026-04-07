@@ -11,7 +11,7 @@ import { createPinMesh, createClusterMesh } from './pins/pinMesh'
 import { buildClusters } from './pins/pinClustering'
 import { createPinUi } from './pins/pinPanel'
 import { setupPinRaycaster } from './pins/pinRaycaster'
-import { setupLongPress } from './pins/pinLongPress'
+import { setupLongPress, setupDoubleClickPlacePin } from './pins/pinLongPress'
 import { createPinState, normalizePin, isLocalPin, bySort, getOptionLabel } from './pins/pinState'
 import { createPinColorMode } from './pins/pinColorMode'
 import { applyStaticTranslations, applyQuestionLabels, refreshViewTexts } from './pins/pinTranslations'
@@ -179,6 +179,20 @@ export function createPinSystem({
   })
 
   setupLongPress({
+    camera,
+    domElement,
+    getState: () => state,
+    getSelectedFloor,
+    getFloorSlabTopY,
+    controls,
+    onFloorClick: ({ floorIndex, position }) => {
+      placePendingPin({ floorIndex, position })
+      panToRevealPin(position)
+      openForm({ floorIndex, position })
+    },
+  })
+
+  setupDoubleClickPlacePin({
     camera,
     domElement,
     getState: () => state,

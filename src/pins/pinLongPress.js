@@ -1,9 +1,7 @@
 /**
- * Long-press gesture detection for mobile pin creation.
- * Allows placing pins by holding a finger on the canvas without
- * entering pin mode first.
+ * Long-press (touch) and double-click (mouse) for placing a pin without pin mode.
  *
- * Exports: setupLongPress.
+ * Exports: setupLongPress, setupDoubleClickPlacePin.
  */
 import * as THREE from 'three'
 
@@ -104,7 +102,7 @@ export function setupLongPress({
     // Skip if pin mode is already active (single tap works there)
     if (state.pinMode) return
     // Skip if form/backdrop is open
-    if (document.querySelector('.ui-form-backdrop.is-visible')) return
+    if (document.querySelector('.ui-modal-backdrop.is-visible')) return
 
     activePointerId = event.pointerId
     startX = event.clientX
@@ -176,4 +174,56 @@ export function setupLongPress({
       cancel()
     }
   }, true)
+}
+
+/**
+ * Desktop: double-click on the floor places a pin and opens the form (same outcome as long-press on touch).
+ */
+export function setupDoubleClickPlacePin({
+  camera,
+  domElement,
+  getState,
+  getSelectedFloor,
+  getFloorSlabTopY,
+  controls,
+  onFloorClick,
+}) {
+  const raycaster = new THREE.Raycaster()
+  const pointer = new THREE.Vector2()
+
+  domElement.addEventListener('dblclick', (event) => {
+    if (event.target.closest('.ui')) return
+
+    const state = getState()
+    if (state.pinMode) return
+    if (document.querySelector('.ui-modal-backdrop.is-visible')) return
+
+    event.preventDefault()
+
+    const rect = domElement.getBoundingClientRect()
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.setFromCamera(pointer, camera)
+
+    const floorIndex = getSelectedFloor()
+    const planeY = typeof getFloorSlabTopY === 'function' ? getFloorSlabTopY(floorIndex) : 0
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY)
+    const point = new THREE.Vector3()
+
+    if (!raycaster.ray.intersectPlane(plane, point)) return
+
+    const backdrop = document.querySelector('.ui-modal-backdrop')
+    if (backdrop) {
+      backdrop.style.setProperty('--longpress-x', event.clientX + 'px')
+      backdrop.style.setProperty('--longpress-y', event.clientY + 'px')
+      backdrop.classList.add('is-longpress')
+    }
+
+    controls.enabled = false
+    requestAnimationFrame(() => {
+      controls.enabled = true
+    })
+
+    onFloorClick({ floorIndex, position: point })
+  })
 }

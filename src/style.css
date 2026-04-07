@@ -372,8 +372,8 @@ canvas {
 }
 
 /*
- * Influence: modal is ~400px max — never use vw for column width (overflow + overlap).
- * Stacked layout: label row, then slider row (indented). Legend aligns with slider column only.
+ * Influence: two columns — label (checkbox+text) | slider track.
+ * Legend row mirrors column widths (spacer + track) so negative/positive sit above the track only.
  */
 .ui-form-influence {
   width: 100%;
@@ -386,8 +386,11 @@ canvas {
 }
 
 .ui-influence-scale-header {
-  display: block;
-  padding: 0 0 8px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 0 6px;
   margin-top: 4px;
 }
 
@@ -396,15 +399,16 @@ canvas {
 }
 
 .ui-influence-label-col-spacer {
-  display: none;
+  flex: 0 1 40%;
+  max-width: 40%;
+  min-width: 0;
+  min-height: 1px;
 }
 
 .ui-influence-legend-col {
-  width: 100%;
-  max-width: 100%;
-  padding-left: 28px;
-  box-sizing: border-box;
+  flex: 1 1 0;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .ui-influence-track-legend {
@@ -429,10 +433,11 @@ canvas {
 
 .ui-influence-row {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
   gap: 8px;
-  padding: 10px 0;
+  padding: 8px 0;
+  min-height: 44px;
   border-bottom: 1px solid #e2e8f0;
   min-width: 0;
 }
@@ -445,7 +450,8 @@ canvas {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  width: 100%;
+  flex: 0 1 40%;
+  max-width: 40%;
   min-width: 0;
   cursor: pointer;
   font-weight: 500;
@@ -469,12 +475,10 @@ canvas {
 }
 
 .ui-influence-slider-col {
-  width: 100%;
-  max-width: 100%;
-  padding-left: 28px;
-  box-sizing: border-box;
-  flex: none;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .ui-influence-slider-wrap input[type='range'] {

@@ -268,6 +268,16 @@ async function loadLanguages() {
 }
 
 async function loadQuestions(language) {
+  // Same order as Admin → „default“ questionnaire (slot order), not raw questions.sort
+  try {
+    const questions = await fetchQuestionnaire({ key: 'default', lang: language })
+    if (Array.isArray(questions) && questions.length) {
+      pinSystem.setQuestions(questions)
+      return
+    }
+  } catch {
+    // fall through
+  }
   try {
     const questions = await fetchQuestions({ lang: language })
     if (Array.isArray(questions) && questions.length) {
