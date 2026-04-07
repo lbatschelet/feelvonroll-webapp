@@ -14,8 +14,8 @@ export const VIEW = {
 export const FLOOR = {
   width: 12,
   depth: 10,
-  height: 2.6,
-  slabThickness: 0.22,
+  height: 2.5,
+  slabThickness: 0.12,
   wallThickness: 0.22,
   wallHeight: 1.7,
   courtyardWidth: 4,

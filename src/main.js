@@ -58,9 +58,12 @@ try {
   // If only a subset exists, the loader skips missing files.
   building = await createBuildingProvider(scene, 'gltf', {
     modelUrlsByFloorIndex: {
+      [-2]: '/models/floor_-2.glb',
       [-1]: '/models/floor_-1.glb',
       [0]: BUILDING_MODEL_URL,
       [1]: '/models/floor_1.glb',
+      [2]: '/models/floor_2.glb',
+      [3]: '/models/floor_3.glb',
     },
   })
 } catch {
