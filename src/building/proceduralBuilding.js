@@ -32,8 +32,14 @@ export function createProceduralBuilding(scene) {
     scene.add(buildingGroup)
   })
 
+  const navigationBounds = new THREE.Box3()
+  floorGroups.forEach((fg) => {
+    navigationBounds.union(new THREE.Box3().setFromObject(fg))
+  })
+
   return {
     floorGroups,
+    navigationBounds,
     maxBasements,
     maxAboveGroundFloors,
     setFloorWallMode,

@@ -39,7 +39,7 @@ export const ORBIT_FEEL = {
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const ORBIT_GLTF_ZOOM = {
-  closestZoom: 0.105,
+  closestZoom: 0.09,
   farthestZoom: 1,
 
   /** Relativ zu D — verhindert nur Extremfälle; vorher haben feste 4…75 closestZoom oft ignoriert */
@@ -49,6 +49,22 @@ export const ORBIT_GLTF_ZOOM = {
   farthestMinOverClosest: 5,
   /** Start nach Laden: mindestens D × dieser Faktor (wenn du zu nah startest) */
   defaultViewMult: 1.12,
+}
+
+/**
+ * Pan-Begrenzung: Orbit-Target (und Kamera) bleiben in X/Z in der Nähe der Modell-Box.
+ * Padding = max(horizontaler Modell-Durchmesser) × panPaddingFactor
+ */
+export const ORBIT_NAVIGATION = {
+  panPaddingFactor: 0.1,
+}
+
+/**
+ * Graue Bodenfläche unter dem Modell (glTF): Vielfaches von suggestedGroundSize,
+ * damit die Plane-Kante beim Rauszoomen nicht sichtbar wird.
+ */
+export const ORBIT_GROUND = {
+  groundPlaneMult: 120,
 }
 
 export const FLOOR = {

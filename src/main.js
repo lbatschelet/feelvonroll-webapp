@@ -20,7 +20,7 @@ import { createTitleBar } from './ui/titleBar'
 import { createPinSystem } from './pins'
 import { fetchLanguages, fetchQuestions, fetchContent, fetchStation, fetchQuestionnaire } from './api'
 import { getFallbackQuestions } from './questionnaire'
-import { ORBIT_GLTF_ZOOM } from './config'
+import { ORBIT_GLTF_ZOOM, ORBIT_GROUND, ORBIT_NAVIGATION } from './config'
 import { getLanguage, onLanguageChange, setLanguage, t } from './i18n'
 import { marked } from 'marked'
 
@@ -124,10 +124,10 @@ function applyImportedModelCameraLimits(b) {
 
 applyImportedModelCameraLimits(building)
 
-// Resize the ground plane to cover the full imported model bounds,
-// so you don't see an edge "cut-off" while moving/zooming.
+// Resize the ground plane — viel grösser als die Modell-Footprint, damit keine Quadrat-Kante sichtbar wird.
 if (building?.source === 'gltf' && typeof building?.suggestedGroundSize === 'number') {
-  ground.scale.set(building.suggestedGroundSize, building.suggestedGroundSize, 1)
+  const extent = building.suggestedGroundSize * ORBIT_GROUND.groundPlaneMult
+  ground.scale.set(extent, extent, 1)
   // Move it away from the model to avoid z-fighting / overlap artifacts.
   ground.position.y = -10
   // Make the ground faint (still provides reference for "keep distance").
@@ -614,10 +614,31 @@ function handleResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 }
 
+function clampPanToNavigationBounds() {
+  const box = building?.navigationBounds
+  if (!box || box.isEmpty()) return
+
+  const size = new THREE.Vector3()
+  box.getSize(size)
+  const pad = ORBIT_NAVIGATION.panPaddingFactor * Math.max(size.x, size.z, 1)
+
+  const t = controls.target
+  const before = t.clone()
+  t.x = THREE.MathUtils.clamp(t.x, box.min.x - pad, box.max.x + pad)
+  t.z = THREE.MathUtils.clamp(t.z, box.min.z - pad, box.max.z + pad)
+  const dx = t.x - before.x
+  const dz = t.z - before.z
+  if (Math.abs(dx) > 1e-9 || Math.abs(dz) > 1e-9) {
+    camera.position.x += dx
+    camera.position.z += dz
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate)
 
   controls.update()
+  clampPanToNavigationBounds()
 
   // Floor-level Y-forcing: keep camera and target locked to the active floor
   if (building?.source !== 'gltf') {

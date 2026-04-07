@@ -204,6 +204,8 @@ export async function createGltfBuilding(scene, { modelUrl, debugSimulateFloors 
 
   // Baseplane removal is handled in the model pipeline (offline).
 
+  const navigationBounds = new THREE.Box3().setFromObject(root)
+
   return {
     source: 'gltf',
     floorGroups,
@@ -221,6 +223,7 @@ export async function createGltfBuilding(scene, { modelUrl, debugSimulateFloors 
     suggestedCameraDistance,
     suggestedCameraFar,
     suggestedGroundSize,
+    navigationBounds,
   }
 }
 
@@ -390,6 +393,7 @@ export async function createStackedGltfBuilding(scene, { modelUrlsByFloorIndex }
     suggestedCameraDistance,
     suggestedCameraFar,
     suggestedGroundSize,
+    navigationBounds: globalBox.clone(),
   }
 }
 
