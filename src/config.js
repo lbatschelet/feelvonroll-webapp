@@ -22,30 +22,31 @@ export const ORBIT_FEEL = {
 }
 
 /**
- * Zoom-Grenzen für importierte glTF-Modelle (main.js → applyImportedModelCameraLimits).
- * D = building.suggestedCameraDistance (aus Bounding-Box).
+ * Zoom für importierte glTF-Modelle (main.js).
+ * D = building.suggestedCameraDistance (Skalierung der Szene, grob „Modellgrösse“).
  *
- * ┌──────────────────────────────────────────────────────────────────────────┐
- * │ ① NAH-GRENZE (stärkstes „Reinzoomen“) → OrbitControls.minDistance         │
- * │    Größer = weiter weg vom Ziel am nächsten erlaubten Punkt               │
- * └──────────────────────────────────────────────────────────────────────────┘
- * minDistance = clamp(D * minDistMult, minDistClampMin, minDistClampMax)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  NUR DIESE ZWEI WERTE MUSST DU ANPASSEN:
  *
- * ┌──────────────────────────────────────────────────────────────────────────┐
- * │ ② WEIT-GRENZE (stärkstes „Rauszoomen“) → OrbitControls.maxDistance        │
- * │    Größer = mehr Überblick                                                │
- * └──────────────────────────────────────────────────────────────────────────┘
- * maxDistance = max(D * maxDistMult, minDistance * maxDistMinOverMin, maxDistFloor)
+ *  closestZoom  —  Wie NAH darf die Kamera maximal zum Zielpunkt (Orbit-Zentrum)?
+ *                 minDistance ≈ D × closestZoom (technisch noch eingegrenzt).
+ *                 Kleiner = näher reinzoomen möglich. Grösser = Stop weiter weg.
  *
- * Startansicht: mindestens D * defaultViewMult (wenn Kamera näher wäre, nach außen)
+ *  farthestZoom —  Wie WEIT darf die Kamera maximal weg?
+ *                 maxDistance hängt von D × farthestZoom ab (plus kleine Sicherheit).
+ *                 Grösser = mehr Überblick / weiter rauszoomen.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 export const ORBIT_GLTF_ZOOM = {
-  minDistMult: 0.11,
-  minDistClampMin: 4,
-  minDistClampMax: 75,
-  maxDistMult: 6.8,
-  maxDistMinOverMin: 5,
-  maxDistFloor: 140,
+  closestZoom: 0.11,
+  farthestZoom: 6.8,
+
+  // Optional: nur wenn die Grenzen bei winzigen/riesigen Modellen komisch werden
+  closestClampMin: 4,
+  closestClampMax: 75,
+  farthestFloor: 140,
+  farthestMinOverClosest: 5,
+  /** Start nach Laden: mindestens D × dieser Faktor (wenn du zu nah startest) */
   defaultViewMult: 1.12,
 }
 
