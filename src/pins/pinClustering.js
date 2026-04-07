@@ -24,7 +24,7 @@ export function buildClusters(pins, camera, controls, domElement, getFloorSlabTo
   pins.forEach((pin) => {
     const slabTopY =
       typeof getFloorSlabTopY === 'function' ? getFloorSlabTopY(pin.floor_index) : pin.position_y
-    const world = new THREE.Vector3(pin.position_x, slabTopY + 0.35, pin.position_z)
+    const world = new THREE.Vector3(pin.position_x, slabTopY + pin.position_y + 0.35, pin.position_z)
     const projected = world.clone().project(camera)
     const screen = {
       x: (projected.x * 0.5 + 0.5) * rect.width,

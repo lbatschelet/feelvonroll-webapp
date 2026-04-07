@@ -26,6 +26,7 @@ import { marked } from 'marked'
 // ── URL parameters ──────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search)
 const captureMode = urlParams.get('mode') === 'capture'
+const captureKind = urlParams.get('capture') || 'camera'
 const stationKey = urlParams.get('station')
 const debugFloors = urlParams.get('debugFloors') === '1'
 const debugFloorVisibility = urlParams.get('debugFloorVisibility') === '1'
@@ -198,6 +199,18 @@ const pinSystem = createPinSystem({
   controls,
   getSelectedFloor: () => selectedFloor,
   getFloorSlabTopY: (floorIndex) => building.getFloorSlabTopY(floorIndex),
+  getPinScale: () => {
+    // If the imported model is huge (often cm/mm export), scale pins up so they're visible.
+    const ground = Number(building?.suggestedGroundSize)
+    if (!Number.isFinite(ground) || ground <= 0) return 1
+    return ground > 2000 ? 100 : 1
+  },
+  getPinLift: () => {
+    // Lift pins above the floor/baseplate. Keep this unit-aware.
+    const ground = Number(building?.suggestedGroundSize)
+    if (!Number.isFinite(ground) || ground <= 0) return 0.35
+    return ground > 2000 ? 35 : 0.35
+  },
   questions: [],
 })
 app.appendChild(pinSystem.ui)
@@ -318,10 +331,27 @@ function bootCaptureMode() {
   // Hide pin system UI in capture mode
   pinSystem.ui.style.display = 'none'
 
+  // Small helper to post back to opener/parent
+  function postCapture(message) {
+    if (window.opener) window.opener.postMessage(message, '*')
+    if (window.parent && window.parent !== window) window.parent.postMessage(message, '*')
+  }
+
   // Create capture UI overlay
   const captureUI = document.createElement('div')
   captureUI.id = 'capture-overlay'
-  captureUI.innerHTML = `
+  captureUI.innerHTML =
+    captureKind === 'pin'
+      ? `
+    <div class="capture-banner">
+      <p><strong>Capture Mode</strong> — Click a point on the floor to select a calibration point, then click “Capture point”.</p>
+      <div class="capture-actions">
+        <button id="capturePointBtn" class="capture-btn" disabled>Capture point</button>
+        <button id="captureCancelBtn" class="capture-btn secondary">Cancel</button>
+      </div>
+    </div>
+  `
+      : `
     <div class="capture-banner">
       <p><strong>Capture Mode</strong> — Navigate to the desired position, then click "Capture".</p>
       <div class="capture-actions">
@@ -332,24 +362,67 @@ function bootCaptureMode() {
   `
   app.appendChild(captureUI)
 
-  document.getElementById('captureBtn').addEventListener('click', () => {
-    const cameraPos = camera.position.clone()
-    const targetPos = controls.target.clone()
+  if (captureKind !== 'pin') {
+    document.getElementById('captureBtn').addEventListener('click', () => {
+      const cameraPos = camera.position.clone()
+      const targetPos = controls.target.clone()
 
-    const message = {
-      type: 'feelvonroll-capture',
-      camera: { x: cameraPos.x, y: cameraPos.y, z: cameraPos.z },
-      target: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
-      floor_index: selectedFloor,
-    }
+      postCapture({
+        type: 'feelvonroll-capture',
+        camera: { x: cameraPos.x, y: cameraPos.y, z: cameraPos.z },
+        target: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+        floor_index: selectedFloor,
+      })
+    })
+  } else {
+    // Capture a clicked point on the active floor plane.
+    const raycaster = new THREE.Raycaster()
+    const pointer = new THREE.Vector2()
+    renderer.domElement.style.cursor = 'crosshair'
 
-    if (window.opener) {
-      window.opener.postMessage(message, '*')
-    }
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage(message, '*')
-    }
-  })
+    // Visible marker so it's obvious what will be captured
+    const ground = Number(building?.suggestedGroundSize)
+    const unitScale = Number.isFinite(ground) && ground > 2000 ? 100 : 1
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18 * unitScale, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xff2d55 })
+    )
+    marker.renderOrder = 1000
+    if ('depthTest' in marker.material) marker.material.depthTest = false
+    marker.visible = false
+    scene.add(marker)
+
+    let selectedPoint = null
+    const capturePointBtn = document.getElementById('capturePointBtn')
+    capturePointBtn.addEventListener('click', () => {
+      if (!selectedPoint) return
+      postCapture({
+        type: 'feelvonroll-capture',
+        // For LV95 calibration we use "target" as the picked point.
+        target: { x: selectedPoint.x, y: selectedPoint.y, z: selectedPoint.z },
+        floor_index: selectedFloor,
+      })
+      window.close()
+    })
+
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return
+      const rect = renderer.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(pointer, camera)
+
+      const planeY = building.getFloorSlabTopY(selectedFloor)
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY)
+      const point = new THREE.Vector3()
+      if (!raycaster.ray.intersectPlane(plane, point)) return
+
+      selectedPoint = point.clone()
+      marker.position.copy(selectedPoint)
+      marker.visible = true
+      capturePointBtn.disabled = false
+    })
+  }
 
   document.getElementById('captureCancelBtn').addEventListener('click', () => {
     window.close()

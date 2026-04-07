@@ -28,7 +28,7 @@ function getFloorIndexFromName(name) {
   return Number(match[1])
 }
 
-function findSlabTopWorldY(floorGroup) {
+function findSlabTopWorldY(floorGroup, { unitScale = 1 } = {}) {
   const slabMarker =
     floorGroup.getObjectByName?.('slabTop') ||
     floorGroup.getObjectByName?.('floor_slabTop') ||
@@ -43,7 +43,10 @@ function findSlabTopWorldY(floorGroup) {
   // Fallback: use the group's world-space bounding box.
   // This is more robust than returning 0, especially for debug multi-floor simulation.
   const box = new THREE.Box3().setFromObject(floorGroup)
-  return box.min.y
+  // Sweet Home exports often include a thin baseplate (e.g. 12cm). If we
+  // don't have an explicit marker, treat slab top as "base + slabThickness".
+  const slabThickness = (FLOOR.slabThickness || 0) * (Number.isFinite(unitScale) ? unitScale : 1)
+  return box.min.y + slabThickness
 }
 
 function hideBasePlanesForFloorGroups({ floorGroups }) {
@@ -192,7 +195,11 @@ export async function createGltfBuilding(scene, { modelUrl, debugSimulateFloors 
   const slabTopByFloorIndex = new Map()
   floorGroups.forEach((group) => {
     const idx = Number(group.userData.floorIndex)
-    slabTopByFloorIndex.set(idx, findSlabTopWorldY(group))
+    const groupBox = new THREE.Box3().setFromObject(group)
+    const groupSize = groupBox.getSize(new THREE.Vector3())
+    const footprint = Math.max(groupSize.x, groupSize.z)
+    const unitScale = footprint > 2000 ? 100 : 1
+    slabTopByFloorIndex.set(idx, findSlabTopWorldY(group, { unitScale }))
   })
 
   // Baseplane removal is handled in the model pipeline (offline).
@@ -313,7 +320,7 @@ export async function createStackedGltfBuilding(scene, { modelUrlsByFloorIndex }
     root.userData.floorIndex = floorIndex
     floorGroups.push(root)
 
-    slabTopByFloorIndex.set(floorIndex, findSlabTopWorldY(root))
+    slabTopByFloorIndex.set(floorIndex, findSlabTopWorldY(root, { unitScale }))
     scene.add(root)
 
     if (debugStack) {

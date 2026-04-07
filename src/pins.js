@@ -33,6 +33,8 @@ export function createPinSystem({
   controls,
   getSelectedFloor,
   getFloorSlabTopY,
+  getPinScale,
+  getPinLift,
   questions,
 }) {
   const state = createPinState(getSelectedFloor())
@@ -321,9 +323,16 @@ export function createPinSystem({
       if (cluster.pins.length === 1) {
         const pin = cluster.pins[0]
         const mesh = createPinMesh(pin, colorMode.getPinColor(pin))
+        const pinScale = typeof getPinScale === 'function' ? Number(getPinScale()) : 1
+        const pinLift = typeof getPinLift === 'function' ? Number(getPinLift()) : 0.35
+        if (Number.isFinite(pinScale) && pinScale > 0) {
+          mesh.scale.setScalar(pinScale)
+        }
         const slabTopY =
           typeof getFloorSlabTopY === 'function' ? getFloorSlabTopY(pin.floor_index) : pin.position_y
-        const baseY = slabTopY + 0.35
+        // Interpret stored `position_y` as an offset from the slab top.
+        // This keeps pins stable when floor stacking / slab markers change.
+        const baseY = slabTopY + pin.position_y + (Number.isFinite(pinLift) ? pinLift : 0.35)
         mesh.position.set(pin.position_x, baseY, pin.position_z)
         mesh.userData.floorIndex = pin.floor_index
         mesh.userData.pinId = pin.id
@@ -338,8 +347,13 @@ export function createPinSystem({
         }
       } else {
         const mesh = createClusterMesh(cluster, clusterTextureCache)
+        const pinScale = typeof getPinScale === 'function' ? Number(getPinScale()) : 1
+        const pinLift = typeof getPinLift === 'function' ? Number(getPinLift()) : 0.35
+        if (Number.isFinite(pinScale) && pinScale > 0) {
+          mesh.scale.setScalar(0.7 * pinScale)
+        }
         mesh.position.copy(cluster.worldPosition)
-        mesh.position.y += 0.4
+        mesh.position.y += (Number.isFinite(pinLift) ? pinLift : 0.35) + 0.05
         mesh.userData.floorIndex = state.activeFloor
         pinGroup.add(mesh)
       }
@@ -356,11 +370,13 @@ export function createPinSystem({
   // ── Pending pin lifecycle ───────────────────────────────────
   function placePendingPin({ floorIndex, position }) {
     removePendingPin()
+    const slabTopY = typeof getFloorSlabTopY === 'function' ? getFloorSlabTopY(floorIndex) : 0
     const draft = {
       id: `local-${Date.now()}`,
       floor_index: floorIndex,
       position_x: position.x,
-      position_y: position.y,
+      // Store Y as offset from slab top (see renderPins()).
+      position_y: position.y - slabTopY,
       position_z: position.z,
       wellbeing: getWellbeingValue(state.questions, state.questionElements),
       reasons: [],
@@ -369,7 +385,12 @@ export function createPinSystem({
       group_key: null,
     }
     const mesh = createPinMesh(draft, colorMode.getPinColor(draft))
-    const baseY = position.y + 0.35
+    const pinScale = typeof getPinScale === 'function' ? Number(getPinScale()) : 1
+    const pinLift = typeof getPinLift === 'function' ? Number(getPinLift()) : 0.35
+    if (Number.isFinite(pinScale) && pinScale > 0) {
+      mesh.scale.setScalar(pinScale)
+    }
+    const baseY = slabTopY + draft.position_y + (Number.isFinite(pinLift) ? pinLift : 0.35)
     mesh.position.set(position.x, baseY, position.z)
     mesh.userData.floorIndex = floorIndex
     mesh.userData.baseY = baseY
@@ -453,7 +474,9 @@ export function createPinSystem({
       viewPanel.classList.add('is-hidden')
       form.dataset.floorIndex = floorIndex
       form.dataset.x = position.x
-      form.dataset.y = position.y
+      // Store Y as offset from slab top (API payload uses `y`).
+      const slabTopY = typeof getFloorSlabTopY === 'function' ? getFloorSlabTopY(floorIndex) : 0
+      form.dataset.y = position.y - slabTopY
       form.dataset.z = position.z
     }
 
