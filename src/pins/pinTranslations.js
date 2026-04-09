@@ -23,6 +23,8 @@ export function applyStaticTranslations(refs, state) {
   refs.viewReasonsLabel.textContent = t('ui.viewReasons')
   refs.viewGroupLabel.textContent = t('questions.group.label')
   refs.viewNoteLabel.textContent = t('ui.viewNote')
+  if (refs.viewQuestionnaire) refs.viewQuestionnaire.textContent = ''
+  if (refs.viewMissing) refs.viewMissing.textContent = ''
   refs.viewPending.textContent = t('ui.viewPending')
 }
 

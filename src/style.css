@@ -622,6 +622,11 @@ canvas {
   border-top: 1px solid #f1f5f9;
 }
 
+.ui-pin-view-questionnaire,
+.ui-pin-view-missing {
+  line-height: 1.25;
+}
+
 .ui-pin-view-pending {
   display: none;
   color: #b45309;

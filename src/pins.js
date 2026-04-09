@@ -4,8 +4,8 @@
  * Exports: createPinSystem.
  */
 import * as THREE from 'three'
-import { createPin, fetchPins } from './api'
-import { onLanguageChange, t } from './i18n'
+import { createPin, fetchPins, fetchStation, fetchQuestionnaire } from './api'
+import { getLanguage, onLanguageChange, t } from './i18n'
 import { formatPercent, formatTimestamp } from './utils/format'
 import { createPinMesh, createClusterMesh } from './pins/pinMesh'
 import { buildClusters } from './pins/pinClustering'
@@ -45,6 +45,52 @@ export function createPinSystem({
     if (typeof requestFrame === 'function') requestFrame()
   }
 
+  // Cache questionnaire lookups so pin view stays snappy.
+  const questionnaireKeyByStationKey = new Map() // station_key -> questionnaire_key
+  const questionsCache = new Map() // `${questionnaire_key}::${lang}` -> questions[]
+  let activeQuestionnaireKey = null
+  let viewLoadToken = 0
+
+  async function ensureQuestionsForPin(pin) {
+    const resolvedLang = getLanguage()
+
+    // Prefer snapshot stored on the pin (correct even if station questionnaire changes later).
+    let qKey = pin?.questionnaire_key ? String(pin.questionnaire_key) : 'default'
+    if (!qKey || qKey === 'null' || qKey === 'undefined') qKey = 'default'
+
+    // Backward compatibility: older pins may have only station_key.
+    if ((!pin?.questionnaire_key || qKey === 'default') && pin?.station_key) {
+      const stationKey = String(pin.station_key)
+      if (questionnaireKeyByStationKey.has(stationKey)) {
+        qKey = questionnaireKeyByStationKey.get(stationKey) || qKey
+      } else {
+        try {
+          const station = await fetchStation(stationKey)
+          const resolved = station?.questionnaire_key || 'default'
+          questionnaireKeyByStationKey.set(stationKey, resolved)
+          if (!pin?.questionnaire_key) qKey = resolved
+        } catch {
+          questionnaireKeyByStationKey.set(stationKey, 'default')
+        }
+      }
+    }
+
+    const cacheKey = `${qKey}::${resolvedLang || ''}`
+    if (!questionsCache.has(cacheKey)) {
+      const qs = await fetchQuestionnaire({ key: qKey, lang: resolvedLang }).catch(() => null)
+      if (Array.isArray(qs) && qs.length) {
+        questionsCache.set(cacheKey, qs)
+      }
+    }
+
+    const nextQuestions = questionsCache.get(cacheKey)
+    if (nextQuestions && qKey !== activeQuestionnaireKey) {
+      activeQuestionnaireKey = qKey
+      setQuestions(nextQuestions)
+      needRender()
+    }
+  }
+
   const pinGroup = new THREE.Group()
   scene.add(pinGroup)
 
@@ -56,13 +102,13 @@ export function createPinSystem({
     panel, toggleButton, backdrop, form, formContent, closeButton, submitButton,
     colorModeRow, legend, viewPanel, viewWellbeing, viewWellbeingLabel,
     viewReasons, viewReasonsLabel, viewGroup, viewGroupLabel, viewGroupRow,
-    viewNote, viewNoteLabel, viewPending, viewTimestamp, viewScoreDot,
+    viewNote, viewNoteLabel, viewPending, viewTimestamp, viewScoreDot, viewQuestionnaire, viewMissing,
   } = ui
 
   const uiRefs = {
     toggleButton, closeButton, submitButton,
     viewWellbeingLabel, viewReasonsLabel, viewGroupLabel, viewNoteLabel, viewPending,
-    viewReasons, viewGroup, viewNote, viewTimestamp,
+    viewReasons, viewGroup, viewNote, viewTimestamp, viewQuestionnaire, viewMissing,
   }
 
   // ── Color mode ──────────────────────────────────────────────
@@ -467,13 +513,22 @@ export function createPinSystem({
   }
 
   // ── Form open / close ───────────────────────────────────────
-  function openForm({ floorIndex, position, pin }) {
+  async function openForm({ floorIndex, position, pin }) {
+    const token = ++viewLoadToken
     form.reset()
     clearFormError(form)
     form.dataset.mode = pin ? 'view' : 'create'
     state.viewPin = pin || null
 
     if (pin) {
+      // Ensure we show labels/options from the right questionnaire (station-specific).
+      try {
+        await ensureQuestionsForPin(pin)
+      } catch {
+        // fall back to whatever is currently loaded
+      }
+      if (token !== viewLoadToken) return
+
       // Highlight the tapped pin (lift + glow, same as hover)
       clearSelectedHighlight()
       const mesh = findPinMesh(pin.id)
@@ -501,6 +556,36 @@ export function createPinSystem({
       viewNote.textContent = pin.note?.trim() ? pin.note : t('ui.empty')
       viewTimestamp.textContent = formatTimestamp(pin.created_at)
       viewTimestamp.dataset.pending = isLocalPin(state, pin.id) && pin.approved === 0 ? 'true' : 'false'
+
+      const qKey = pin?.questionnaire_key ? String(pin.questionnaire_key) : 'default'
+      viewQuestionnaire.textContent = `${t('ui.viewQuestionnaire')} ${qKey}`
+
+      const generic =
+        (pin && typeof pin.generic_answers === 'object' && pin.generic_answers) ? pin.generic_answers : {}
+      const asked = Array.isArray(pin.asked_questions) ? pin.asked_questions : []
+      const missing = [] // asked but unanswered
+      const notAsked = [] // in questionnaire but not asked (pool)
+
+      const isAsked = (key) =>
+        asked.includes(key) || ['wellbeing', 'reasons', 'group', 'note'].includes(key)
+      state.questions.forEach((q) => {
+        const key = q.key
+        if (!isAsked(key)) {
+          notAsked.push(q.label || key)
+          return
+        }
+        let ok = false
+        if (key === 'wellbeing') ok = Number.isFinite(Number(pin.wellbeing))
+        else if (key === 'reasons') ok = Array.isArray(reasons) && reasons.length > 0
+        else if (key === 'group') ok = !!group
+        else if (key === 'note') ok = !!(pin.note && String(pin.note).trim())
+        else ok = generic[key] !== undefined && generic[key] !== null && String(generic[key]).trim() !== ''
+        if (!ok) missing.push(q.label || key)
+      })
+      const parts = []
+      if (missing.length) parts.push(`${t('ui.viewMissing')} ${missing.join(', ')}`)
+      if (notAsked.length) parts.push(`${t('ui.viewNotAsked')} ${notAsked.join(', ')}`)
+      viewMissing.textContent = parts.join('\n')
     } else {
       disableQuestions(false, state.questionElements)
       submitButton.disabled = false

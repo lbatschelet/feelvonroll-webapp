@@ -8,7 +8,7 @@ import { t } from '../i18n'
  * Creates the view panel DOM and returns element references.
  * @returns {{ viewPanel, viewWellbeing, viewWellbeingLabel, viewReasons, viewReasonsLabel,
  *             viewGroup, viewGroupLabel, viewGroupRow, viewNote, viewNoteLabel,
- *             viewPending, viewTimestamp, viewScoreDot }}
+ *             viewPending, viewTimestamp, viewScoreDot, viewQuestionnaire, viewMissing }}
  */
 export function createPinViewPanel() {
   const viewPanel = document.createElement('div')
@@ -32,6 +32,8 @@ export function createPinViewPanel() {
       <span class="ui-pin-view-value ui-pin-view-note">${t('ui.empty')}</span>
     </div>
     <div class="ui-pin-view-meta">
+      <span class="ui-pin-view-questionnaire"></span>
+      <span class="ui-pin-view-missing"></span>
       <span class="ui-pin-view-timestamp">${t('ui.empty')}</span>
       <span class="ui-pin-view-pending">${t('ui.viewPending')}</span>
     </div>
@@ -51,5 +53,7 @@ export function createPinViewPanel() {
     viewPending: viewPanel.querySelector('.ui-pin-view-pending'),
     viewTimestamp: viewPanel.querySelector('.ui-pin-view-timestamp'),
     viewScoreDot: viewPanel.querySelector('.ui-pin-view-dot'),
+    viewQuestionnaire: viewPanel.querySelector('.ui-pin-view-questionnaire'),
+    viewMissing: viewPanel.querySelector('.ui-pin-view-missing'),
   }
 }
