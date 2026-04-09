@@ -286,7 +286,21 @@ scheduleFrame()
 onLanguageChange((language) => {
   languageSwitcher.setActiveLanguage(language)
   languageSwitcher.setAriaLabel(t('ui.language'))
-  loadQuestions(language)
+  // Keep the currently active questionnaire stable.
+  // In station mode, reload the station-specific questionnaire instead of overwriting with "default".
+  if (stationKey) {
+    bootStationMode(stationKey)
+  } else {
+    loadQuestions(language)
+  }
+  // Always keep a global question library available for color legend fallback.
+  fetchQuestions({ lang: language })
+    .then((globalQuestions) => {
+      if (Array.isArray(globalQuestions) && globalQuestions.length) {
+        pinSystem.setGlobalColorQuestions(globalQuestions)
+      }
+    })
+    .catch(() => {})
   loadAboutContent(language)
 })
 
@@ -299,6 +313,13 @@ if (captureMode) {
   bootStationMode(stationKey)
 } else {
   loadQuestions(getLanguage())
+  fetchQuestions({ lang: getLanguage() })
+    .then((globalQuestions) => {
+      if (Array.isArray(globalQuestions) && globalQuestions.length) {
+        pinSystem.setGlobalColorQuestions(globalQuestions)
+      }
+    })
+    .catch(() => {})
 }
 loadAboutContent(getLanguage())
 
@@ -328,7 +349,9 @@ async function loadQuestions(language) {
   // Same order as Admin → „default“ questionnaire (slot order), not raw questions.sort
   try {
     const questions = await fetchQuestionnaire({ key: 'default', lang: language })
-    if (Array.isArray(questions) && questions.length) {
+    // If the questionnaire endpoint succeeds, trust it even if empty.
+    // Falling back to /questions.php can show questions that are not in the questionnaire.
+    if (Array.isArray(questions)) {
       pinSystem.setQuestions(questions)
       return
     }
@@ -531,7 +554,7 @@ async function bootStationMode(key) {
     const questionnaireKey = station.questionnaire_key || 'default'
     try {
       const questions = await fetchQuestionnaire({ key: questionnaireKey, lang })
-      if (Array.isArray(questions) && questions.length) {
+      if (Array.isArray(questions)) {
         pinSystem.setQuestions(questions)
         return
       }

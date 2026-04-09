@@ -7,8 +7,6 @@
  */
 import { t } from '../i18n'
 import { formatTimestamp } from '../utils/format'
-import { safeParseReasons } from './pinForm'
-import { getOptionLabel } from './pinState'
 
 /**
  * Apply static i18n strings to the pin panel UI elements.
@@ -20,11 +18,7 @@ export function applyStaticTranslations(refs, state) {
   refs.closeButton.setAttribute('aria-label', t('ui.close'))
   refs.submitButton.textContent = t('ui.save')
   refs.viewWellbeingLabel.textContent = t('ui.viewWellbeing')
-  refs.viewReasonsLabel.textContent = t('ui.viewReasons')
-  refs.viewGroupLabel.textContent = t('questions.group.label')
-  refs.viewNoteLabel.textContent = t('ui.viewNote')
-  if (refs.viewQuestionnaire) refs.viewQuestionnaire.textContent = ''
-  if (refs.viewMissing) refs.viewMissing.textContent = ''
+  if (refs.viewStation) refs.viewStation.textContent = ''
   refs.viewPending.textContent = t('ui.viewPending')
 }
 
@@ -51,15 +45,6 @@ export function applyQuestionLabels(state, refs, updateColorModeButtons) {
     if (question.key === 'wellbeing') {
       refs.viewWellbeingLabel.textContent = question.label || t('ui.viewWellbeing')
     }
-    if (question.key === 'reasons') {
-      refs.viewReasonsLabel.textContent = question.label || t('ui.viewReasons')
-    }
-    if (question.key === 'group') {
-      refs.viewGroupLabel.textContent = question.label || t('questions.group.label')
-    }
-    if (question.key === 'note') {
-      refs.viewNoteLabel.textContent = question.label || t('ui.viewNote')
-    }
   })
   updateColorModeButtons()
 }
@@ -71,12 +56,5 @@ export function applyQuestionLabels(state, refs, updateColorModeButtons) {
  */
 export function refreshViewTexts(state, refs) {
   if (!state.viewPin) return
-  const reasons = safeParseReasons(state.viewPin.reasons)
-  const group = state.viewPin.group_key || ''
-  refs.viewReasons.textContent = reasons.length
-    ? reasons.map((key) => getOptionLabel(state, 'reasons', key)).join(', ')
-    : t('ui.empty')
-  refs.viewGroup.textContent = group ? getOptionLabel(state, 'group', group) : t('ui.empty')
-  refs.viewNote.textContent = state.viewPin.note?.trim() ? state.viewPin.note : t('ui.empty')
   refs.viewTimestamp.textContent = formatTimestamp(state.viewPin.created_at)
 }

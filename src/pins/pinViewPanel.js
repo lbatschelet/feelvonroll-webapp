@@ -19,21 +19,9 @@ export function createPinViewPanel() {
       <span class="ui-pin-view-score"></span>
       <span class="ui-pin-view-label wellbeing">${t('ui.viewWellbeing')}</span>
     </div>
-    <div class="ui-pin-view-section">
-      <span class="ui-pin-view-label reasons">${t('ui.viewReasons')}</span>
-      <span class="ui-pin-view-value ui-pin-view-reasons">${t('ui.empty')}</span>
-    </div>
-    <div class="ui-pin-view-section ui-pin-view-group-row">
-      <span class="ui-pin-view-label group">${t('questions.group.label')}</span>
-      <span class="ui-pin-view-value ui-pin-view-group">${t('ui.empty')}</span>
-    </div>
-    <div class="ui-pin-view-section">
-      <span class="ui-pin-view-label note">${t('ui.viewNote')}</span>
-      <span class="ui-pin-view-value ui-pin-view-note">${t('ui.empty')}</span>
-    </div>
+    <div class="ui-pin-view-answers"></div>
     <div class="ui-pin-view-meta">
-      <span class="ui-pin-view-questionnaire"></span>
-      <span class="ui-pin-view-missing"></span>
+      <span class="ui-pin-view-station"></span>
       <span class="ui-pin-view-timestamp">${t('ui.empty')}</span>
       <span class="ui-pin-view-pending">${t('ui.viewPending')}</span>
     </div>
@@ -43,17 +31,10 @@ export function createPinViewPanel() {
     viewPanel,
     viewWellbeing: viewPanel.querySelector('.ui-pin-view-score'),
     viewWellbeingLabel: viewPanel.querySelector('.ui-pin-view-label.wellbeing'),
-    viewReasons: viewPanel.querySelector('.ui-pin-view-reasons'),
-    viewReasonsLabel: viewPanel.querySelector('.ui-pin-view-label.reasons'),
-    viewGroup: viewPanel.querySelector('.ui-pin-view-group'),
-    viewGroupLabel: viewPanel.querySelector('.ui-pin-view-label.group'),
-    viewGroupRow: viewPanel.querySelector('.ui-pin-view-group-row'),
-    viewNote: viewPanel.querySelector('.ui-pin-view-note'),
-    viewNoteLabel: viewPanel.querySelector('.ui-pin-view-label.note'),
+      viewAnswers: viewPanel.querySelector('.ui-pin-view-answers'),
+      viewStation: viewPanel.querySelector('.ui-pin-view-station'),
     viewPending: viewPanel.querySelector('.ui-pin-view-pending'),
     viewTimestamp: viewPanel.querySelector('.ui-pin-view-timestamp'),
     viewScoreDot: viewPanel.querySelector('.ui-pin-view-dot'),
-    viewQuestionnaire: viewPanel.querySelector('.ui-pin-view-questionnaire'),
-    viewMissing: viewPanel.querySelector('.ui-pin-view-missing'),
   }
 }

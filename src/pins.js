@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { createPin, fetchPins, fetchStation, fetchQuestionnaire } from './api'
 import { getLanguage, onLanguageChange, t } from './i18n'
 import { formatPercent, formatTimestamp } from './utils/format'
+import { fromPercentValue } from './utils/sliderMath'
 import { createPinMesh, createClusterMesh } from './pins/pinMesh'
 import { buildClusters } from './pins/pinClustering'
 import { createPinUi } from './pins/pinPanel'
@@ -101,14 +102,14 @@ export function createPinSystem({
   const {
     panel, toggleButton, backdrop, form, formContent, closeButton, submitButton,
     colorModeRow, legend, viewPanel, viewWellbeing, viewWellbeingLabel,
-    viewReasons, viewReasonsLabel, viewGroup, viewGroupLabel, viewGroupRow,
-    viewNote, viewNoteLabel, viewPending, viewTimestamp, viewScoreDot, viewQuestionnaire, viewMissing,
+    viewAnswers, viewStation,
+    viewPending, viewTimestamp, viewScoreDot,
   } = ui
 
   const uiRefs = {
     toggleButton, closeButton, submitButton,
-    viewWellbeingLabel, viewReasonsLabel, viewGroupLabel, viewNoteLabel, viewPending,
-    viewReasons, viewGroup, viewNote, viewTimestamp, viewQuestionnaire, viewMissing,
+    viewWellbeingLabel, viewPending,
+    viewTimestamp, viewStation,
   }
 
   // ── Color mode ──────────────────────────────────────────────
@@ -119,6 +120,11 @@ export function createPinSystem({
   onLanguageChange(() => {
     applyStaticTranslations(uiRefs, state)
     colorMode.updateLegend()
+    if (state.viewPin && form.dataset.mode === 'view' && !viewPanel.classList.contains('is-hidden')) {
+      // Re-render the view modal so labels/options & influence bars update with language.
+      renderPinView(state.viewPin)
+      return
+    }
     refreshViewTexts(state, uiRefs)
   })
 
@@ -131,6 +137,12 @@ export function createPinSystem({
     toggleButton.textContent = state.pinMode ? t('ui.pinToggleActive') : t('ui.pinToggleIdle')
     controls.enabled = !state.pinMode
     document.body.classList.toggle('pin-mode', state.pinMode)
+    // Ensure the color legend is present when entering pin mode.
+    if (state.pinMode) {
+      colorMode.updateColorQuestions()
+      colorMode.updateLegend()
+      needRender()
+    }
   })
 
   document.addEventListener('keydown', (event) => {
@@ -229,7 +241,6 @@ export function createPinSystem({
     onPinClick: (pin) => openForm({ pin }),
     onFloorClick: ({ floorIndex, position }) => {
       placePendingPin({ floorIndex, position })
-      panToRevealPin(position)
       openForm({ floorIndex, position })
     },
   })
@@ -243,7 +254,6 @@ export function createPinSystem({
     controls,
     onFloorClick: ({ floorIndex, position }) => {
       placePendingPin({ floorIndex, position })
-      panToRevealPin(position)
       openForm({ floorIndex, position })
     },
   })
@@ -257,7 +267,6 @@ export function createPinSystem({
     controls,
     onFloorClick: ({ floorIndex, position }) => {
       placePendingPin({ floorIndex, position })
-      panToRevealPin(position)
       openForm({ floorIndex, position })
     },
   })
@@ -349,7 +358,6 @@ export function createPinSystem({
         state.optionsByQuestion.set(question.key, question.options)
       }
     })
-    viewGroupRow.style.display = state.questions.some((q) => q.key === 'group') ? '' : 'none'
     colorMode.updateColorQuestions()
     renderFormQuestions(state.questions, formContent, state.questionElements)
     applyQuestionLabels(state, uiRefs, colorMode.updateColorModeButtons)
@@ -371,6 +379,11 @@ export function createPinSystem({
       const wellbeing = sliders.find((q) => q.key === 'wellbeing')
       state.globalColorQuestions = wellbeing ? [wellbeing] : sliders.slice(0, 1)
     }
+    // Rebuild legend immediately (bottom-left pin panel).
+    colorMode.updateColorQuestions()
+    colorMode.updateLegend()
+    colorMode.refreshPinColors()
+    needRender()
   }
 
   // ── Pins loading / rendering ────────────────────────────────
@@ -513,6 +526,166 @@ export function createPinSystem({
   }
 
   // ── Form open / close ───────────────────────────────────────
+  function renderPinView(pin) {
+    // Hero shows the globally configured "pin color" slider (not necessarily wellbeing).
+    const heroQuestion =
+      colorMode.getActiveColorQuestion() || state.questions.find((q) => q.key === 'wellbeing') || null
+    const heroKey = heroQuestion?.key || 'wellbeing'
+    const heroRaw = (heroKey === 'wellbeing') ? pin.wellbeing : (
+      heroKey === 'note' ? pin.note :
+      heroKey === 'group' ? pin.group_key :
+      heroKey === 'reasons' ? safeParseReasons(pin.reasons) :
+      ((pin && typeof pin.generic_answers === 'object' && pin.generic_answers) ? pin.generic_answers : {})[heroKey]
+    )
+    viewWellbeingLabel.textContent = heroQuestion?.label || t('ui.viewWellbeing')
+    viewWellbeing.textContent = heroQuestion?.type === 'slider'
+      ? formatPercent(heroRaw)
+      : String(heroRaw ?? t('ui.empty'))
+    viewScoreDot.style.background = colorMode.getPinColor(pin).getStyle()
+    viewTimestamp.textContent = formatTimestamp(pin.created_at)
+    viewTimestamp.dataset.pending = isLocalPin(state, pin.id) && pin.approved === 0 ? 'true' : 'false'
+
+    // Station (only if actually set)
+    const stationKey = pin?.station_key ? String(pin.station_key) : ''
+    const showStation = stationKey && stationKey !== 'default' && stationKey !== 'null' && stationKey !== 'undefined'
+    viewStation.textContent = showStation ? `Station: ${stationKey}` : ''
+
+    // Render answered questions in asked order (fully dynamic).
+    const generic =
+      (pin && typeof pin.generic_answers === 'object' && pin.generic_answers) ? pin.generic_answers : {}
+    const askedRaw = Array.isArray(pin.asked_questions) ? pin.asked_questions : []
+    // Some pins (especially freshly created ones returned from create endpoint) may not include asked_questions yet.
+    // Fall back to the currently loaded questionnaire order so rendering matches other pins.
+    const asked = askedRaw.length ? askedRaw : (state.questions || []).map((q) => q.key).filter(Boolean)
+    const answeredRows = []
+
+    const getRawAnswerForKey = (key) => {
+      if (key === 'wellbeing') return pin.wellbeing
+      if (key === 'note') return pin.note
+      if (key === 'group') return pin.group_key
+      if (key === 'reasons') return safeParseReasons(pin.reasons)
+      return generic[key]
+    }
+    const isAnswered = (value) => {
+      if (value == null) return false
+      if (Array.isArray(value)) return value.length > 0
+      if (typeof value === 'object') return Object.keys(value).length > 0
+      if (typeof value === 'string') {
+        const s = value.trim()
+        if (!s) return false
+        if (s[0] === '{') {
+          try {
+            const parsed = JSON.parse(s)
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              return Object.keys(parsed).length > 0
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return true
+      }
+      return String(value).trim() !== ''
+    }
+    const formatAnswered = (question, raw) => {
+      if (!question) return String(raw)
+      if (question.type === 'slider') {
+        const min = Number.isFinite(Number(question.config?.min)) ? Number(question.config.min) : 0
+        const max = Number.isFinite(Number(question.config?.max)) ? Number(question.config.max) : 1
+        const low = question.legend_low || ''
+        const high = question.legend_high || ''
+        const v = fromPercentValue(raw, question.config || {})
+        const n = (max === min) ? 0.5 : Math.max(0, Math.min(1, (Number(v) - min) / (max - min)))
+        const pct = Math.round(n * 100)
+        const legend = (low || high)
+          ? `<div class="ui-pin-view-slider-legend"><span>${low}</span><span>${high}</span></div>`
+          : ''
+        return `<div class="ui-pin-view-slider">${legend}<div class="ui-pin-view-slider-bar" aria-hidden="true"><div class="ui-pin-view-slider-fill" style="width:${pct}%"></div></div></div>`
+      }
+      if (question.type === 'text') return String(raw || '').trim() || t('ui.empty')
+      if (question.type === 'multi') {
+        const arr = Array.isArray(raw) ? raw : (raw ? [raw] : [])
+        return arr.length ? arr.map((k) => getOptionLabel(state, question.key, k)).join(', ') : t('ui.empty')
+      }
+      if (question.type === 'influence') {
+        let obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+        if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw)
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) obj = parsed
+          } catch {
+            // ignore
+          }
+        }
+        const keys = Object.keys(obj)
+        if (!keys.length) return t('ui.empty')
+        const min = Number.isFinite(Number(question.config?.min)) ? Number(question.config.min) : -1
+        const max = Number.isFinite(Number(question.config?.max)) ? Number(question.config.max) : 1
+        const neg = question.legend_negative || ''
+        const pos = question.legend_positive || ''
+        const clamp01 = (x) => Math.max(0, Math.min(1, x))
+        const norm = (v) => (max === min ? 0.5 : (v - min) / (max - min))
+
+        const legend = (neg || pos)
+          ? `<div class="ui-pin-view-influence-legend"><span><span>${neg}</span><span>${pos}</span></span><span></span></div>`
+          : ''
+
+        const rows = keys
+          .map((optKey) => {
+            const label = getOptionLabel(state, question.key, optKey)
+            const v = Number(obj[optKey])
+            // Normalize to 0..1 with a robust heuristic:
+            // - If config suggests a signed range (e.g. -1..1) but stored values are 0..1 (center=0.5),
+            //   treat the value as already-normalized.
+            // - Otherwise normalize using configured min/max.
+            let t = 0.5
+            if (Number.isFinite(v)) {
+              const looksNormalized01 = v >= 0 && v <= 1
+              const configIs01 = min >= 0 && max <= 1
+              t = (looksNormalized01 && !configIs01) ? clamp01(v) : clamp01(norm(v))
+            }
+            const signed = t - 0.5
+            // Fill should be relative to the full width: max half-range => 50%.
+            const pct = Math.round(Math.min(0.5, Math.abs(signed)) * 100) // 0..50 from center
+            const negPct = signed < 0 ? pct : 0
+            const posPct = signed > 0 ? pct : 0
+            return `
+              <div class="ui-pin-view-influence-row">
+                <div class="ui-pin-view-influence-label">${label}</div>
+                <div class="ui-pin-view-influence-bar" aria-hidden="true">
+                  <div class="ui-pin-view-influence-fill neg" style="width:${negPct}%"></div>
+                  <div class="ui-pin-view-influence-fill pos" style="width:${posPct}%"></div>
+                  <div class="ui-pin-view-influence-center"></div>
+                </div>
+              </div>
+            `
+          })
+          .join('')
+
+        return `<div class="ui-pin-view-influence">${legend}${rows}</div>`
+      }
+      return String(raw)
+    }
+
+    asked.forEach((key) => {
+      if (key === heroKey) return
+      const question = state.questions.find((q) => q.key === key) || null
+      const raw = getRawAnswerForKey(key)
+      if (!isAnswered(raw)) return
+      const label = question?.label || key
+      const value = formatAnswered(question, raw)
+      answeredRows.push({ key, label, value })
+    })
+
+    viewAnswers.innerHTML = answeredRows.length
+      ? answeredRows
+        .map((row) =>
+          `<div class="ui-pin-view-section"><span class="ui-pin-view-label">${row.label}</span><span class="ui-pin-view-value">${row.value}</span></div>`
+        )
+        .join('')
+      : `<div class="ui-pin-view-section"><span class="ui-pin-view-value">${t('ui.empty')}</span></div>`
+  }
+
   async function openForm({ floorIndex, position, pin }) {
     const token = ++viewLoadToken
     form.reset()
@@ -547,47 +720,14 @@ export function createPinSystem({
       submitButton.classList.add('is-hidden')
       formContent.classList.add('is-hidden')
       viewPanel.classList.remove('is-hidden')
-      viewWellbeing.textContent = formatPercent(pin.wellbeing)
-      viewScoreDot.style.background = colorMode.getPinColor(pin).getStyle()
-      viewReasons.textContent = reasons.length
-        ? reasons.map((key) => getOptionLabel(state, 'reasons', key)).join(', ')
-        : t('ui.empty')
-      viewGroup.textContent = group ? getOptionLabel(state, 'group', group) : t('ui.empty')
-      viewNote.textContent = pin.note?.trim() ? pin.note : t('ui.empty')
-      viewTimestamp.textContent = formatTimestamp(pin.created_at)
-      viewTimestamp.dataset.pending = isLocalPin(state, pin.id) && pin.approved === 0 ? 'true' : 'false'
-
-      const qKey = pin?.questionnaire_key ? String(pin.questionnaire_key) : 'default'
-      viewQuestionnaire.textContent = `${t('ui.viewQuestionnaire')} ${qKey}`
-
-      const generic =
-        (pin && typeof pin.generic_answers === 'object' && pin.generic_answers) ? pin.generic_answers : {}
-      const asked = Array.isArray(pin.asked_questions) ? pin.asked_questions : []
-      const missing = [] // asked but unanswered
-      const notAsked = [] // in questionnaire but not asked (pool)
-
-      const isAsked = (key) =>
-        asked.includes(key) || ['wellbeing', 'reasons', 'group', 'note'].includes(key)
-      state.questions.forEach((q) => {
-        const key = q.key
-        if (!isAsked(key)) {
-          notAsked.push(q.label || key)
-          return
-        }
-        let ok = false
-        if (key === 'wellbeing') ok = Number.isFinite(Number(pin.wellbeing))
-        else if (key === 'reasons') ok = Array.isArray(reasons) && reasons.length > 0
-        else if (key === 'group') ok = !!group
-        else if (key === 'note') ok = !!(pin.note && String(pin.note).trim())
-        else ok = generic[key] !== undefined && generic[key] !== null && String(generic[key]).trim() !== ''
-        if (!ok) missing.push(q.label || key)
-      })
-      const parts = []
-      if (missing.length) parts.push(`${t('ui.viewMissing')} ${missing.join(', ')}`)
-      if (notAsked.length) parts.push(`${t('ui.viewNotAsked')} ${notAsked.join(', ')}`)
-      viewMissing.textContent = parts.join('\n')
+      renderPinView(pin)
     } else {
       disableQuestions(false, state.questionElements)
+      // Influence questions must start collapsed/disabled unless user explicitly enables them.
+      // `form.reset()` doesn't reliably reset our dynamically wired influence rows.
+      state.questions
+        .filter((q) => q && q.type === 'influence')
+        .forEach((q) => setQuestionValue(q.key, {}, state.questions, state.questionElements))
       submitButton.disabled = false
       submitButton.classList.remove('is-hidden')
       formContent.classList.remove('is-hidden')

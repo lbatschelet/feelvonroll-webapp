@@ -139,6 +139,13 @@ export function renderQuestions(questions, formContent, questionElements) {
 
         const sliderWrap = document.createElement('div')
         sliderWrap.className = 'ui-influence-slider-col ui-influence-slider-wrap is-collapsed'
+        const midBar = document.createElement('div')
+        midBar.className = 'ui-influence-midbar'
+        midBar.innerHTML = `
+          <div class="ui-influence-midfill neg" aria-hidden="true"></div>
+          <div class="ui-influence-midfill pos" aria-hidden="true"></div>
+          <div class="ui-influence-midcenter" aria-hidden="true"></div>
+        `
         const slider = document.createElement('input')
         slider.type = 'range'
         slider.min = cfg.min ?? -1
@@ -147,7 +154,24 @@ export function renderQuestions(questions, formContent, questionElements) {
         slider.value = String(getSliderDefault(cfg))
         slider.disabled = true
         slider.setAttribute('aria-label', option.label || option.key)
+        sliderWrap.appendChild(midBar)
         sliderWrap.appendChild(slider)
+
+        const syncMidFill = () => {
+          const min = Number(slider.min)
+          const max = Number(slider.max)
+          const v = Number(slider.value)
+          const t = (max === min) ? 0.5 : (v - min) / (max - min) // 0..1
+          const delta = t - 0.5
+          // Width is relative to the full track; half-range should fill at most 50%.
+          const pct = Math.round(Math.min(0.5, Math.abs(delta)) * 100) // 0..50
+          const neg = midBar.querySelector('.ui-influence-midfill.neg')
+          const pos = midBar.querySelector('.ui-influence-midfill.pos')
+          if (neg) neg.style.width = delta < 0 ? `${pct}%` : '0%'
+          if (pos) pos.style.width = delta > 0 ? `${pct}%` : '0%'
+        }
+        slider.addEventListener('input', syncMidFill)
+        syncMidFill()
 
         checkbox.addEventListener('change', () => {
           const on = checkbox.checked
@@ -155,6 +179,7 @@ export function renderQuestions(questions, formContent, questionElements) {
           slider.disabled = !on
           if (!on) {
             slider.value = String(getSliderDefault(cfg))
+            syncMidFill()
           }
           syncInfluenceScaleHeader()
         })

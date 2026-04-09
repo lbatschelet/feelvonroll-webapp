@@ -7,7 +7,7 @@ import * as THREE from 'three'
 /* ── Shared geometry (created once, reused by all pins) ─────────── */
 
 // Slightly larger pins for better legibility.
-const SPHERE_RADIUS = 0.22
+const SPHERE_RADIUS = 0.24
 let _sharedGeo = null
 
 function getSharedSphereGeometry() {

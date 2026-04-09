@@ -94,17 +94,26 @@ export function createPinColorMode({ state, legend, colorModeRow, form, pinGroup
 
   /** Determine which slider questions can drive pin color. */
   function updateColorQuestions() {
+    // Prefer the globally configured "pin color" slider (exactly one should be flagged).
+    // This should be stable regardless of which questionnaire is currently loaded.
+    if (Array.isArray(state.globalColorQuestions) && state.globalColorQuestions.length) {
+      const global = state.globalColorQuestions.filter((q) => q && q.type === 'slider')
+      if (global.length) {
+        state.colorQuestions = [...global]
+        if (!state.colorQuestionKey || !global.some((q) => q.key === state.colorQuestionKey)) {
+          state.colorQuestionKey = global[0]?.key || null
+        }
+        updateColorModeButtons()
+        return
+      }
+    }
+
     const sliderQuestions = state.questions.filter((q) => q.type === 'slider')
     const flagged = sliderQuestions.filter((q) => q.config?.use_for_color)
     let colorQuestions = flagged
     if (!colorQuestions.length) {
       const wellbeing = sliderQuestions.find((q) => q.key === 'wellbeing')
       colorQuestions = wellbeing ? [wellbeing] : sliderQuestions.slice(0, 1)
-    }
-    // If station questionnaire has no suitable color slider, fall back to
-    // the global question library (loaded separately for color purposes).
-    if (!colorQuestions.length && state.globalColorQuestions?.length) {
-      colorQuestions = [...state.globalColorQuestions]
     }
     state.colorQuestions = colorQuestions
     if (!state.colorQuestionKey || !colorQuestions.some((q) => q.key === state.colorQuestionKey)) {
