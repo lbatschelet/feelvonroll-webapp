@@ -599,7 +599,7 @@ function updateFloorVisibility() {
     } else {
       building.setFloorWallMode(group, false)
       // Ghost floors: visible hint under the active floor.
-      setGroupOpacity(group, 0.35)
+      setGroupOpacity(group, 0.22)
     }
   })
 

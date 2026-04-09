@@ -350,7 +350,7 @@ export function createPinSystem({
     const allPins = [...state.pins, ...state.localPins].filter(
       (pin) => pin.floor_index === state.activeFloor
     )
-    const clusters = buildClusters(allPins, camera, controls, domElement, getFloorSlabTopY)
+    const clusters = buildClusters(allPins, camera, controls, domElement, getFloorSlabTopY, getPinLift)
     clusters.forEach((cluster) => {
       if (cluster.pins.length === 1) {
         const pin = cluster.pins[0]

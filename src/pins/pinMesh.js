@@ -6,7 +6,8 @@ import * as THREE from 'three'
 
 /* ── Shared geometry (created once, reused by all pins) ─────────── */
 
-const SPHERE_RADIUS = 0.18
+// Slightly larger pins for better legibility.
+const SPHERE_RADIUS = 0.22
 let _sharedGeo = null
 
 function getSharedSphereGeometry() {
@@ -60,7 +61,8 @@ export function createClusterMesh(cluster, textureCache) {
   const texture = getClusterTexture(cluster.pins.length, textureCache)
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true })
   const sprite = new THREE.Sprite(material)
-  sprite.scale.set(0.7, 0.7, 1)
+  // Make clusters more readable (especially after increasing pin size).
+  sprite.scale.set(1.05, 1.05, 1)
   sprite.material.depthTest = false
   sprite.material.depthWrite = false
   sprite.renderOrder = 999
@@ -77,7 +79,7 @@ function getClusterTexture(count, textureCache) {
   if (textureCache.has(count)) {
     return textureCache.get(count)
   }
-  const size = 128
+  const size = 192
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
@@ -88,7 +90,7 @@ function getClusterTexture(count, textureCache) {
   ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2)
   ctx.fill()
   ctx.fillStyle = '#f9fafb'
-  ctx.font = 'bold 48px Inter, system-ui, sans-serif'
+  ctx.font = 'bold 72px Inter, system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(String(count), size / 2, size / 2)
