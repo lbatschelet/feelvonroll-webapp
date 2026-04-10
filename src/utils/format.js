@@ -3,6 +3,7 @@
  * Exports: formatPercent, formatTimestamp.
  */
 import { getLocale, t } from '../i18n'
+import { TIME_ZONE } from '../time'
 
 export function formatPercent(value) {
   const numeric = Number(value)
@@ -18,5 +19,5 @@ export function formatTimestamp(value) {
   if (!value) return t('ui.empty')
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString(getLocale())
+  return date.toLocaleString(getLocale(), { timeZone: TIME_ZONE })
 }
