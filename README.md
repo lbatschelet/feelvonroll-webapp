@@ -7,7 +7,7 @@ Public-facing 3D web application for the [feelvonRoll](https://github.com/lbatsc
 
 ## Features
 
-- **3D building model** rendered with Three.js, with multiple navigable floors
+- **3D building model** rendered with Three.js: imported **GLB** meshes per floor (from `public/models/floor_<index>.glb`), with a procedural fallback if assets are missing
 - **Interactive pin placement**: click a location on any floor to start the questionnaire
 - **Dynamic questionnaire**: fetched from the API, supports sliders, multi-choice, and free text
 - **Station mode**: QR code links pre-position the camera and load a station-specific questionnaire
@@ -54,14 +54,17 @@ npm test
 
 ## Architecture
 
-- `src/main.js` -- Entry point: scene setup, station/capture mode routing, floor visibility
-- `src/building/` -- Procedural building geometry (floors, walls)
+- `src/main.js` -- Entry point: glTF building load (stacked floors from `public/models/`), orbit controls, station/capture mode, floor visibility
+- `src/config.js` -- Camera, orbit limits, and tuning for imported GLB scale
+- `src/scene.js` -- Scene helpers (ground plane, lighting)
+- `src/floors.js` -- Floor indices, visibility, raycast plane for pin placement
+- `src/building/` -- `buildingProvider`: procedural fallback and **glTF** stacked-floor loader (`gltfBuilding.js`, `proceduralBuilding.js`)
 - `src/pins.js` -- Pin system orchestrator (state, rendering, raycasting, colors)
-- `src/pins/` -- Pin subsystems: color mode, clustering, form, mesh, raycaster, translations
+- `src/pins/` -- Pin subsystems: color mode, clustering, form, mesh, raycaster, translations, long-press
 - `src/ui/` -- UI overlays: floor selector, language switcher, about overlay, title bar
 - `src/api.js` -- API client (pins, questions, questionnaires, stations, content, languages)
 - `src/i18n.js` -- Internationalization with translation loading
 
 ## License
 
-[AGPL-3.0](../LICENSE) -- [Lukas Batschelet](https://lukasbatschelet.ch) for [PHBern](https://www.phbern.ch)
+[AGPL-3.0](LICENSE) -- [Lukas Batschelet](https://lukasbatschelet.ch) for [PHBern](https://www.phbern.ch)
