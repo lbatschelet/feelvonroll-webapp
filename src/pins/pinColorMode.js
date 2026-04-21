@@ -6,7 +6,7 @@
  * Exports: createPinColorMode.
  */
 import { fromPercentValue } from '../utils/sliderMath'
-import { NEUTRAL_COLOR, getSliderColor } from './pinColors'
+import { NEUTRAL_COLOR, getSliderColor, getSliderGradient } from './pinColors'
 
 /**
  * Creates a color-mode controller bound to the given state and UI refs.
@@ -81,8 +81,7 @@ export function createPinColorMode({ state, legend, colorModeRow, form, pinGroup
     if (!colorQuestion) return
     const gradient = document.createElement('div')
     gradient.className = 'ui-legend-gradient'
-    gradient.style.background =
-      'linear-gradient(90deg, #6c2fa0, #8b3fc7, #b545c9, #db4ca1, #f25c78, #ff7b54, #ffa042, #ffc639, #ffe145, #fff176)'
+    gradient.style.background = getSliderGradient(colorQuestion.config)
     const labels = document.createElement('div')
     labels.className = 'ui-legend-labels'
     labels.innerHTML = `<span>${colorQuestion.legend_low || ''}</span><span>${
