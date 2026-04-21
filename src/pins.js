@@ -15,6 +15,7 @@ import { setupPinRaycaster } from './pins/pinRaycaster'
 import { setupLongPress, setupDoubleClickPlacePin } from './pins/pinLongPress'
 import { createPinState, normalizePin, isLocalPin, bySort, getOptionLabel } from './pins/pinState'
 import { createPinColorMode } from './pins/pinColorMode'
+import { createModal } from './ui/modal'
 import { applyStaticTranslations, applyQuestionLabels, refreshViewTexts } from './pins/pinTranslations'
 import {
   renderQuestions as renderFormQuestions,
@@ -111,14 +112,17 @@ export function createPinSystem({
     viewWellbeingLabel, viewPending,
     viewTimestamp, viewStation,
   }
+  const discardDialog = createDiscardDialog()
 
   // ── Color mode ──────────────────────────────────────────────
   const colorMode = createPinColorMode({ state, legend, colorModeRow, form, pinGroup })
 
   // ── Translations ────────────────────────────────────────────
   applyStaticTranslations(uiRefs, state)
+  updateDiscardDialogTexts()
   onLanguageChange(() => {
     applyStaticTranslations(uiRefs, state)
+    updateDiscardDialogTexts()
     colorMode.updateLegend()
     if (state.viewPin && form.dataset.mode === 'view' && !viewPanel.classList.contains('is-hidden')) {
       // Re-render the view modal so labels/options & influence bars update with language.
@@ -147,8 +151,9 @@ export function createPinSystem({
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return
+    if (discardDialog.backdrop.classList.contains('is-visible')) return
     if (backdrop.classList.contains('is-visible')) {
-      closeForm()
+      void requestCloseForm()
       return
     }
     if (state.pinMode) {
@@ -176,6 +181,8 @@ export function createPinSystem({
 
   // ── Camera pan to reveal pin behind modal ───────────────────
   let panTween = null
+  let hasUnsavedFormChanges = false
+  let discardDialogPromise = null
 
   function panToRevealPin(position3D) {
     // Cancel any running pan
@@ -272,9 +279,13 @@ export function createPinSystem({
   })
 
   // ── Form events ─────────────────────────────────────────────
-  closeButton.addEventListener('click', closeForm)
+  closeButton.addEventListener('click', () => {
+    void requestCloseForm()
+  })
   backdrop.addEventListener('click', (event) => {
-    if (event.target === backdrop) closeForm()
+    if (event.target === backdrop) {
+      void requestCloseForm()
+    }
   })
 
   submitButton.addEventListener('click', async (event) => {
@@ -306,6 +317,9 @@ export function createPinSystem({
   })
 
   form.addEventListener('input', () => {
+    if (form.dataset.mode === 'create' && backdrop.classList.contains('is-visible')) {
+      hasUnsavedFormChanges = true
+    }
     colorMode.updatePreviewColor()
     colorMode.refreshPendingPinColor()
     needRender()
@@ -322,7 +336,7 @@ export function createPinSystem({
     resetUi: () => {
       // If modal is open, closeForm handles pinMode + pending cleanup.
       if (backdrop.classList.contains('is-visible')) {
-        closeForm()
+        void requestCloseForm()
         return
       }
       // Otherwise, ensure we exit pin-mode and remove any pending draft mesh.
@@ -750,6 +764,7 @@ export function createPinSystem({
       formContent.classList.add('is-hidden')
       viewPanel.classList.remove('is-hidden')
       renderPinView(pin)
+      hasUnsavedFormChanges = false
     } else {
       disableQuestions(false, state.questionElements)
       // form.reset() already restores slider values to their defaults,
@@ -773,6 +788,7 @@ export function createPinSystem({
       const slabTopY = typeof getFloorSlabTopY === 'function' ? getFloorSlabTopY(floorIndex) : 0
       form.dataset.y = position.y - slabTopY
       form.dataset.z = position.z
+      hasUnsavedFormChanges = false
     }
 
     colorMode.updatePreviewColor()
@@ -788,6 +804,7 @@ export function createPinSystem({
     form.dataset.y = ''
     form.dataset.z = ''
     state.viewPin = null
+    hasUnsavedFormChanges = false
     clearSelectedHighlight()
     if (form.dataset.mode === 'create') {
       removePendingPin()
@@ -798,5 +815,110 @@ export function createPinSystem({
     controls.enabled = true
     document.body.classList.remove('pin-mode')
     needRender()
+  }
+
+  async function requestCloseForm() {
+    if (!(await canCloseForm())) return false
+    closeForm()
+    return true
+  }
+
+  async function canCloseForm() {
+    if (form.dataset.mode !== 'create') return true
+    if (!hasUnsavedFormChanges) return true
+    if (discardDialogPromise) return discardDialogPromise
+    discardDialogPromise = showDiscardDraftDialog().finally(() => {
+      discardDialogPromise = null
+    })
+    return discardDialogPromise
+  }
+
+  function createDiscardDialog() {
+    const { backdrop, modal, closeButton: dismissButton } = createModal()
+    backdrop.classList.add('ui-discard-dialog-backdrop')
+    modal.classList.add('ui-discard-dialog')
+    dismissButton.classList.add('ui-discard-dialog-close')
+
+    const title = document.createElement('h3')
+    title.className = 'ui-discard-dialog-title'
+
+    const message = document.createElement('p')
+    message.className = 'ui-discard-dialog-message'
+
+    const actions = document.createElement('div')
+    actions.className = 'ui-discard-dialog-actions'
+
+    const stayButton = document.createElement('button')
+    stayButton.type = 'button'
+    stayButton.className = 'ui-discard-dialog-stay'
+
+    const saveButton = document.createElement('button')
+    saveButton.type = 'button'
+    saveButton.className = 'ui-discard-dialog-save'
+
+    const discardButton = document.createElement('button')
+    discardButton.type = 'button'
+    discardButton.className = 'ui-discard-dialog-discard'
+
+    actions.appendChild(stayButton)
+    actions.appendChild(saveButton)
+    actions.appendChild(discardButton)
+    modal.appendChild(title)
+    modal.appendChild(message)
+    modal.appendChild(actions)
+
+    return { backdrop, dismissButton, title, message, stayButton, saveButton, discardButton }
+  }
+
+  function updateDiscardDialogTexts() {
+    discardDialog.dismissButton.setAttribute('aria-label', t('ui.close'))
+    discardDialog.title.textContent = t('ui.discardDraftTitle')
+    discardDialog.message.textContent = t('ui.discardDraftMessage')
+    discardDialog.stayButton.textContent = t('ui.discardDraftStay')
+    discardDialog.saveButton.textContent = t('ui.discardDraftSave')
+    discardDialog.discardButton.textContent = t('ui.discardDraftDiscard')
+  }
+
+  function showDiscardDraftDialog() {
+    updateDiscardDialogTexts()
+    return new Promise((resolve) => {
+      const { backdrop, dismissButton, stayButton, saveButton, discardButton } = discardDialog
+      backdrop.classList.add('is-visible')
+
+      const teardown = (confirmed) => {
+        backdrop.classList.remove('is-visible')
+        dismissButton.removeEventListener('click', handleCancel)
+        stayButton.removeEventListener('click', handleCancel)
+        saveButton.removeEventListener('click', handleSave)
+        discardButton.removeEventListener('click', handleConfirm)
+        backdrop.removeEventListener('click', handleBackdrop)
+        document.removeEventListener('keydown', handleKeydown)
+        resolve(confirmed)
+      }
+
+      const handleCancel = () => teardown(false)
+      const handleSave = () => {
+        teardown(false)
+        submitButton.click()
+      }
+      const handleConfirm = () => teardown(true)
+      const handleBackdrop = (event) => {
+        if (event.target === backdrop) teardown(false)
+      }
+      const handleKeydown = (event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        teardown(false)
+      }
+
+      dismissButton.addEventListener('click', handleCancel)
+      stayButton.addEventListener('click', handleCancel)
+      saveButton.addEventListener('click', handleSave)
+      discardButton.addEventListener('click', handleConfirm)
+      backdrop.addEventListener('click', handleBackdrop)
+      document.addEventListener('keydown', handleKeydown)
+
+      stayButton.focus()
+    })
   }
 }

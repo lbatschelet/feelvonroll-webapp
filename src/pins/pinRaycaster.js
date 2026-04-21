@@ -47,7 +47,8 @@ export function setupPinRaycaster({
 
   // ── Click handling ─────────────────────────────────────────────
   domElement.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return
+    const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0
+    if (!isPrimaryPointer) return
     if (event.target.closest('.ui')) return
 
     const rect = domElement.getBoundingClientRect()

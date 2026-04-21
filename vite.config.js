@@ -12,6 +12,8 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5174,
+    strictPort: true,
     // Redirect /issue to /issue/ so the MPA entry resolves correctly
     middlewareMode: false,
   },

@@ -35,11 +35,14 @@ export function setupLongPress({
   let startY = 0
   let ripple = null
   let activePointerId = null
+  let lastTouchPointerDownAt = 0
 
   // Suppress context menu during / right after long-press
   let suppressContextMenu = false
   domElement.addEventListener('contextmenu', (event) => {
-    if (activePointerId !== null || suppressContextMenu) {
+    const recentTouchInteraction = Date.now() - lastTouchPointerDownAt < 1000
+    const inPinMode = Boolean(getState()?.pinMode)
+    if (activePointerId !== null || suppressContextMenu || recentTouchInteraction || inPinMode) {
       event.preventDefault()
     }
   })
@@ -104,6 +107,7 @@ export function setupLongPress({
     // Skip if form/backdrop is open
     if (document.querySelector('.ui-modal-backdrop.is-visible')) return
 
+    lastTouchPointerDownAt = Date.now()
     activePointerId = event.pointerId
     startX = event.clientX
     startY = event.clientY

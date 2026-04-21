@@ -344,6 +344,68 @@ canvas {
   fill: none;
 }
 
+.ui-discard-dialog-backdrop {
+  z-index: 4;
+}
+
+.ui-discard-dialog {
+  width: min(92vw, 380px);
+  padding: 24px 18px 18px;
+  max-height: none;
+}
+
+.ui-discard-dialog-close {
+  top: 10px;
+  right: 10px;
+}
+
+.ui-discard-dialog-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ui-discard-dialog-message {
+  margin: 10px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #4b5563;
+}
+
+.ui-discard-dialog-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.ui-discard-dialog-stay,
+.ui-discard-dialog-save,
+.ui-discard-dialog-discard {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ui-discard-dialog-stay {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.ui-discard-dialog-save {
+  background: #1f2937;
+  color: #f9fafb;
+}
+
+.ui-discard-dialog-discard {
+  background: #b91c1c;
+  color: #f9fafb;
+}
+
 /* Neutral sliders — pin preview color only on map orbs, not on controls */
 .ui-form input[type='range'] {
   accent-color: #64748b;
@@ -1403,9 +1465,6 @@ button:focus-visible {
 }
 
 /* ── Prototype view controls (rotate buttons) ────────────────────────── */
-@media (pointer: coarse) {
-  .ui-view-controls { display: none !important; }
-}
 
 .ui-view-controls {
   pointer-events: auto;
@@ -1436,6 +1495,10 @@ button:focus-visible {
 
 .ui-view-controls-btn:hover {
   background: #c4cfde;
+}
+
+.ui-view-controls-btn:active {
+  background: #b6c2d5;
 }
 
 .ui-view-controls-icon {

@@ -60,19 +60,20 @@ export function createControls(camera, domElement) {
   controls.target.set(0, 3, 0)
   controls.update()
   controls.mouseButtons = {
-    // Trackpad/mouse:
-    // - one finger / drag gesture -> pan (move)
-    // - right mouse button -> rotate
+    // Desktop mouse / click-drag interaction:
+    // - left drag -> pan (move map/model)
+    // - middle drag -> rotate
+    // - wheel handles zoom
     LEFT: THREE.MOUSE.PAN,
-    MIDDLE: THREE.MOUSE.DOLLY,
-    RIGHT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.ROTATE,
+    RIGHT: THREE.MOUSE.PAN,
   }
   controls.touches = {
-    // Touchscreen:
-    // - one finger drag -> pan
-    // - two fingers drag -> rotate (+ dolly on pinch if available)
+    // Touch gestures:
+    // - one finger drag -> pan only
+    // - two fingers -> zoom (rotation handled by explicit twist logic in main.js)
     ONE: THREE.TOUCH.PAN,
-    TWO: THREE.TOUCH.DOLLY_ROTATE,
+    TWO: THREE.TOUCH.DOLLY_PAN,
   }
 
   controls.minPolarAngle = VIEW.polarAngle

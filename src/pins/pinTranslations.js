@@ -56,5 +56,35 @@ export function applyQuestionLabels(state, refs, updateColorModeButtons) {
  */
 export function refreshViewTexts(state, refs) {
   if (!state.viewPin) return
+  const reasonKeys = normalizeReasonKeys(state.viewPin.reasons)
+  const reasonLabels = reasonKeys
+    .map((key) => getOptionLabel(state, 'reasons', key))
+    .filter(Boolean)
+  refs.viewReasons.textContent = reasonLabels.join(', ')
+  refs.viewGroup.textContent = getOptionLabel(state, 'group', state.viewPin.group_key || '')
+  refs.viewNote.textContent = state.viewPin.note || ''
   refs.viewTimestamp.textContent = formatTimestamp(state.viewPin.created_at)
+}
+
+function getOptionLabel(state, questionKey, optionKey) {
+  if (!optionKey) return ''
+  const options = state.optionsByQuestion?.get(questionKey)
+  if (!Array.isArray(options)) return optionKey
+  const match = options.find((option) => option.key === optionKey || option.option_key === optionKey)
+  return match?.label || optionKey
+}
+
+function normalizeReasonKeys(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+    try {
+      const parsed = JSON.parse(trimmed)
+      return Array.isArray(parsed) ? parsed : [trimmed]
+    } catch {
+      return [trimmed]
+    }
+  }
+  return []
 }

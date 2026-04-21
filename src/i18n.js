@@ -17,6 +17,14 @@ const translations = {
     'ui.viewNotAsked': 'Nicht gefragt:',
     'ui.viewPending':
       'Dieser Pin wartet auf Freigabe und ist für andere noch nicht sichtbar.',
+    'ui.confirmDiscardPinDraft':
+      'Ungespeicherte Eingaben gehen verloren. Pin-Erstellung wirklich abbrechen?',
+    'ui.discardDraftTitle': 'Eingaben verwerfen?',
+    'ui.discardDraftMessage':
+      'Du hast ungespeicherte Eingaben. Zum sicheren Beenden zuerst speichern.',
+    'ui.discardDraftStay': 'Weiter bearbeiten',
+    'ui.discardDraftSave': 'Speichern',
+    'ui.discardDraftDiscard': 'Verwerfen',
     'ui.empty': '—',
     'error.saveFailed': 'Speichern fehlgeschlagen',
     'error.noLocation': 'Kein Standort gewählt',
@@ -59,6 +67,14 @@ const translations = {
     'ui.viewMissing': 'Unanswered:',
     'ui.viewNotAsked': 'Not asked:',
     'ui.viewPending': 'This pin is awaiting approval and is not visible to others yet.',
+    'ui.confirmDiscardPinDraft':
+      'You have unsaved changes. Discard this pin draft?',
+    'ui.discardDraftTitle': 'Discard draft?',
+    'ui.discardDraftMessage':
+      'You have unsaved inputs. To close safely, save first.',
+    'ui.discardDraftStay': 'Continue editing',
+    'ui.discardDraftSave': 'Save',
+    'ui.discardDraftDiscard': 'Discard',
     'ui.empty': '—',
     'error.saveFailed': 'Failed to save',
     'error.noLocation': 'No location selected',

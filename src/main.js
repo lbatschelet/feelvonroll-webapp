@@ -137,8 +137,7 @@ if (building?.source === 'gltf' && typeof building?.suggestedGroundSize === 'num
   ground.material.depthWrite = false
 }
 
-// Optional rotate buttons (helps when trackpad gesture mapping is unclear).
-// Uses OrbitControls' internal rotate delta.
+// Optional rotate buttons as an explicit fallback control.
 const rotateOverlay = document.createElement('div')
 rotateOverlay.className = 'ui-view-controls'
 rotateOverlay.innerHTML = `
@@ -149,16 +148,121 @@ rotateOverlay.innerHTML = `
 `
 
 const rotButtons = rotateOverlay.querySelectorAll('button[data-rot]')
+const isLikelyTouchscreen =
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(pointer: coarse)')?.matches === true &&
+  (navigator.maxTouchPoints || 0) > 0
+function rotateCameraAroundTarget(angle) {
+  if (!Number.isFinite(angle) || angle === 0) return
+  const offset = camera.position.clone().sub(controls.target)
+  const spherical = new THREE.Spherical().setFromVector3(offset)
+  spherical.theta += angle
+  offset.setFromSpherical(spherical)
+  camera.position.copy(controls.target).add(offset)
+  controls.update()
+  scheduleFrame()
+}
+
+function handleTouchpadRotateGesture(event) {
+  if (!controls.enabled) return
+  // On trackpads, two-finger horizontal gestures usually arrive as wheel with pixel deltas.
+  // Convert horizontal movement into orbit rotation for intuitive multitouch rotation.
+  if (event.deltaMode !== 0) return
+  const absX = Math.abs(event.deltaX)
+  if (absX < 1.5) return
+  event.preventDefault()
+  const angle = THREE.MathUtils.clamp(event.deltaX * 0.0022, -0.12, 0.12)
+  rotateCameraAroundTarget(angle)
+}
+
+let touchpadGestureLastRotation = null
+const TOUCH_TWIST_SENSITIVITY = 0.36
+const TOUCH_TWIST_DIRECTION = 1
+function handleTouchpadNativeGesture(event) {
+  // iOS Safari can also emit gesture events for touchscreens.
+  // Keep this handler for trackpads only; touchscreen twist is handled by pointer math below.
+  if (isLikelyTouchscreen) return
+  if (!controls.enabled) return
+  if (typeof event.rotation !== 'number') return
+  event.preventDefault()
+  if (touchpadGestureLastRotation === null) {
+    touchpadGestureLastRotation = event.rotation
+    return
+  }
+  const deltaDeg = event.rotation - touchpadGestureLastRotation
+  touchpadGestureLastRotation = event.rotation
+  const angle = THREE.MathUtils.clamp(-THREE.MathUtils.degToRad(deltaDeg), -0.2, 0.2)
+  rotateCameraAroundTarget(angle)
+}
+
+function resetTouchpadNativeGesture() {
+  touchpadGestureLastRotation = null
+}
+
+const activeTouchPointers = new Map()
+let touchTwistLastAngle = null
+let panWasEnabledBeforeTwist = true
+
+function getTouchPairAngle() {
+  if (activeTouchPointers.size < 2) return null
+  const touches = Array.from(activeTouchPointers.values())
+  const a = touches[0]
+  const b = touches[1]
+  return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX)
+}
+
+function normalizeAngleDelta(delta) {
+  let next = delta
+  while (next > Math.PI) next -= Math.PI * 2
+  while (next < -Math.PI) next += Math.PI * 2
+  return next
+}
+
+function updateTwoFingerTwistRotation() {
+  if (!controls.enabled || activeTouchPointers.size < 2) return
+  const angle = getTouchPairAngle()
+  if (!Number.isFinite(angle)) return
+  if (touchTwistLastAngle === null) {
+    touchTwistLastAngle = angle
+    panWasEnabledBeforeTwist = controls.enablePan
+    controls.enablePan = false
+    return
+  }
+  const delta = normalizeAngleDelta(angle - touchTwistLastAngle)
+  touchTwistLastAngle = angle
+  if (Math.abs(delta) < 0.0025) return
+  rotateCameraAroundTarget(delta * TOUCH_TWIST_SENSITIVITY * TOUCH_TWIST_DIRECTION)
+}
+
+function handleTouchPointerDown(event) {
+  if (event.pointerType !== 'touch') return
+  activeTouchPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
+  if (activeTouchPointers.size === 2) {
+    touchTwistLastAngle = null
+  }
+}
+
+function handleTouchPointerMove(event) {
+  if (event.pointerType !== 'touch') return
+  if (!activeTouchPointers.has(event.pointerId)) return
+  activeTouchPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
+  updateTwoFingerTwistRotation()
+}
+
+function handleTouchPointerEnd(event) {
+  if (event.pointerType !== 'touch') return
+  activeTouchPointers.delete(event.pointerId)
+  if (activeTouchPointers.size < 2) {
+    touchTwistLastAngle = null
+    controls.enablePan = panWasEnabledBeforeTwist
+  }
+}
 rotButtons.forEach((btn) => {
   btn.addEventListener('click', (e) => {
     e.preventDefault()
     const dir = Number(btn.dataset.rot || 0)
     if (dir === 0) return
-    if (typeof controls._rotateLeft === 'function') {
-      controls._rotateLeft(dir * Math.PI / 18)
-      controls.update()
-      scheduleFrame()
-    }
+    rotateCameraAroundTarget(dir * Math.PI / 18)
   })
 })
 
@@ -306,7 +410,15 @@ document.addEventListener('visibilitychange', () => {
   }
 })
 const canvas = renderer.domElement
+canvas.addEventListener('gesturestart', resetTouchpadNativeGesture, { passive: false })
+canvas.addEventListener('gesturechange', handleTouchpadNativeGesture, { passive: false })
+canvas.addEventListener('gestureend', resetTouchpadNativeGesture, { passive: false })
+canvas.addEventListener('pointerdown', handleTouchPointerDown, { passive: true })
+canvas.addEventListener('pointermove', handleTouchPointerMove, { passive: true })
+canvas.addEventListener('pointerup', handleTouchPointerEnd, { passive: true })
+canvas.addEventListener('pointercancel', handleTouchPointerEnd, { passive: true })
 canvas.addEventListener('pointerdown', scheduleFrame, { passive: true })
+canvas.addEventListener('wheel', handleTouchpadRotateGesture, { passive: false })
 canvas.addEventListener('wheel', scheduleFrame, { passive: true })
 canvas.addEventListener('pointermove', scheduleFrame, { passive: true })
 controls.addEventListener('change', scheduleFrame)
