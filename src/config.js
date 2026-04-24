@@ -5,7 +5,7 @@ export const VIEW = {
   // keeping the canvas background identical to the CSS background.
   background: '#f3f4f6',
   // Default: camera from the opposite corner than before.
-  cameraPosition: new THREE.Vector3(14, 16, -14),
+  cameraPosition: new THREE.Vector3(12, 14, -12),
   polarAngle: THREE.MathUtils.degToRad(50),
   minDistance: 6,
   maxDistance: 40,
@@ -48,7 +48,7 @@ export const ORBIT_GLTF_ZOOM = {
   farthestFloor: 140,
   farthestMinOverClosest: 5,
   /** Start nach Laden: mindestens D × dieser Faktor (wenn du zu nah startest) */
-  defaultViewMult: 1.12,
+  defaultViewMult: 0.3,
 }
 
 /**
