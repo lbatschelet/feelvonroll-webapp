@@ -30,6 +30,7 @@ const urlParams = new URLSearchParams(window.location.search)
 const captureMode = urlParams.get('mode') === 'capture'
 const captureKind = urlParams.get('capture') || 'camera'
 const stationKey = urlParams.get('station')
+const kioskMode = urlParams.get('kiosk') === '1'
 const debugFloors = urlParams.get('debugFloors') === '1'
 const debugFloorVisibility = urlParams.get('debugFloorVisibility') === '1'
 
@@ -345,6 +346,44 @@ function scheduleFrame() {
   rafId = requestAnimationFrame(tick)
 }
 
+function setupKioskAutoReload() {
+  if (!kioskMode) return
+
+  const INACTIVITY_MS = 60_000
+  let inactivityTimer = null
+  let hasUserActivity = false
+
+  const reloadPage = () => {
+    window.location.reload()
+  }
+
+  const resetInactivityTimer = () => {
+    if (inactivityTimer !== null) {
+      clearTimeout(inactivityTimer)
+    }
+    inactivityTimer = window.setTimeout(reloadPage, INACTIVITY_MS)
+  }
+
+  const onUserActivity = () => {
+    hasUserActivity = true
+    resetInactivityTimer()
+  }
+
+  // Only arm the timer after the first user interaction.
+  const activityEvents = ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart', 'mousedown']
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, onUserActivity, { passive: true })
+  })
+
+  document.addEventListener('visibilitychange', () => {
+    // Returning to the tab starts a fresh inactivity window,
+    // but only after the user has interacted at least once.
+    if (!document.hidden && hasUserActivity) {
+      resetInactivityTimer()
+    }
+  })
+}
+
 function tick() {
   rafId = null
   if (typeof document !== 'undefined' && document.hidden) return
@@ -430,6 +469,7 @@ canvas.addEventListener('wheel', scheduleFrame, { passive: true })
 canvas.addEventListener('pointermove', scheduleFrame, { passive: true })
 controls.addEventListener('change', scheduleFrame)
 scheduleFrame()
+setupKioskAutoReload()
 
 onLanguageChange((language) => {
   languageSwitcher.setActiveLanguage(language)
