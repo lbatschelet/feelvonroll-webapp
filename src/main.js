@@ -52,10 +52,14 @@ function parsePathRoute(pathname) {
   // Path mode for iOS home screen shortcuts where query params may be dropped:
   // - /kiosk/<stationKey>
   // - /station/<stationKey>
+  // - /s/<stationKey>  (short station route for QR codes)
   if (parts[0] === 'kiosk') {
     return { kioskMode: true, stationKey: parts[1] || null }
   }
   if (parts[0] === 'station') {
+    return { kioskMode: false, stationKey: parts[1] || null }
+  }
+  if (parts[0] === 's') {
     return { kioskMode: false, stationKey: parts[1] || null }
   }
 

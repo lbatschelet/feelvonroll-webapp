@@ -20,4 +20,6 @@
   # Path-based station/kiosk routes (used especially for iOS home-screen mode).
   RewriteRule ^kiosk/[^/]+/?$ /index.html [L]
   RewriteRule ^station/[^/]+/?$ /index.html [L]
+  # Short station route for QR codes: /s/<station>
+  RewriteRule ^s/[^/]+/?$ /index.html [L]
 </IfModule>

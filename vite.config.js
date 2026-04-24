@@ -29,8 +29,8 @@ export default defineConfig({
             return
           }
           // Dev convenience for iOS-home-screen-friendly path routes:
-          // serve the main app entry for /kiosk/<station> and /station/<station>.
-          if (url.startsWith('/kiosk/') || url.startsWith('/station/')) {
+          // serve the main app entry for /kiosk/<station>, /station/<station>, /s/<station>.
+          if (url.startsWith('/kiosk/') || url.startsWith('/station/') || url.startsWith('/s/')) {
             req.url = '/'
           }
           next()
@@ -39,7 +39,7 @@ export default defineConfig({
       configurePreviewServer(server) {
         server.middlewares.use((req, _res, next) => {
           const url = req.url || ''
-          if (url.startsWith('/kiosk/') || url.startsWith('/station/')) {
+          if (url.startsWith('/kiosk/') || url.startsWith('/station/') || url.startsWith('/s/')) {
             req.url = '/'
           }
           next()
