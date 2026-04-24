@@ -6,7 +6,23 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#f3f4f6" />
-    <link rel="manifest" href="/manifest.json" />
+    <script>
+      // iOS home-screen installs can ignore deep links when a manifest with
+      // start_url is present. For station-specific shortcuts we keep the exact
+      // URL by not attaching the manifest on iOS.
+      (function attachManifestForNonIOS() {
+        const ua = navigator.userAgent || ''
+        const platform = navigator.platform || ''
+        const isIOS =
+          /iPad|iPhone|iPod/.test(ua) ||
+          (platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+        if (isIOS) return
+        const link = document.createElement('link')
+        link.rel = 'manifest'
+        link.href = '/manifest.json'
+        document.head.appendChild(link)
+      })()
+    </script>
     <title>feelvonRoll</title>
   </head>
   <body>
