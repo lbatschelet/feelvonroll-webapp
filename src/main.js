@@ -27,12 +27,40 @@ import { marked } from 'marked'
 
 // ── URL parameters ──────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search)
+const pathRoute = parsePathRoute(window.location.pathname)
 const captureMode = urlParams.get('mode') === 'capture'
 const captureKind = urlParams.get('capture') || 'camera'
-const stationKey = urlParams.get('station')
-const kioskMode = urlParams.get('kiosk') === '1'
+const stationKey = urlParams.get('station') || pathRoute.stationKey
+const kioskMode = urlParams.get('kiosk') === '1' || pathRoute.kioskMode
 const debugFloors = urlParams.get('debugFloors') === '1'
 const debugFloorVisibility = urlParams.get('debugFloorVisibility') === '1'
+
+function parsePathRoute(pathname) {
+  const rawParts = String(pathname || '').split('/').filter(Boolean)
+  const parts = rawParts.map((part) => {
+    try {
+      return decodeURIComponent(part)
+    } catch {
+      return part
+    }
+  })
+
+  if (!parts.length) {
+    return { kioskMode: false, stationKey: null }
+  }
+
+  // Path mode for iOS home screen shortcuts where query params may be dropped:
+  // - /kiosk/<stationKey>
+  // - /station/<stationKey>
+  if (parts[0] === 'kiosk') {
+    return { kioskMode: true, stationKey: parts[1] || null }
+  }
+  if (parts[0] === 'station') {
+    return { kioskMode: false, stationKey: parts[1] || null }
+  }
+
+  return { kioskMode: false, stationKey: null }
+}
 
 
 // ── Scene setup ─────────────────────────────────────────────
