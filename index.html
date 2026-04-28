@@ -25,6 +25,7 @@
     </script>
     <script>
       // Load Plausible everywhere except localhost to avoid polluting analytics during local dev.
+      // Use first-party paths (/js/script.js, /api/event) so fewer adblockers block it.
       (function loadPlausible() {
         const host = (window.location && window.location.hostname) || ''
         const isLocalhost =
@@ -34,21 +35,11 @@
           host.endsWith('.local')
         if (isLocalhost) return
 
-        window.plausible =
-          window.plausible ||
-          function () {
-            ;(plausible.q = plausible.q || []).push(arguments)
-          }
-        plausible.init =
-          plausible.init ||
-          function (i) {
-            plausible.o = i || {}
-          }
-        plausible.init()
-
         const s = document.createElement('script')
-        s.async = true
-        s.src = 'https://analytics.baets.ch/js/pa-iGqcFL0fvRTrFicZfvw0d.js'
+        s.defer = true
+        s.setAttribute('data-domain', 'feelvonroll.ch')
+        s.setAttribute('data-api', '/api/event')
+        s.src = '/js/script.js'
         document.head.appendChild(s)
       })()
     </script>

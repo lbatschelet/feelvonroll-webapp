@@ -1,3 +1,26 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # --- Plausible first-party proxy endpoints ---
+  # These help avoid common adblock filter lists by serving Plausible under your domain.
+  #
+  # Requirements on the server:
+  # - mod_rewrite enabled
+  # - Proxying enabled (RewriteRule [P]) via mod_proxy + mod_proxy_http
+
+  RewriteRule ^js/script\.js$ https://analytics.baets.ch/js/script.js [P,L]
+  RewriteRule ^api/event$ https://analytics.baets.ch/api/event [P,L]
+
+  # --- SPA fallback ---
+  # If the requested file or directory exists, serve it directly.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Otherwise, fall back to index.html (let the SPA handle routing).
+  RewriteRule ^ index.html [L]
+</IfModule>
+
 # Routing support for static webapp deployment (Apache)
 #
 # Why:
