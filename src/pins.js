@@ -448,7 +448,7 @@ export function createPinSystem({
       // Keep unapproved pins only in-session for the author (localPins).
       state.pins = rawPins
         .map(normalizePin)
-        .filter((pin) => Number(pin.approved) === 1)
+        .filter((pin) => pin?.status === 'approved' || Number(pin.approved) === 1)
       state.localPins = state.localPins.filter(
         (pin) => !state.pins.some((p) => p.id === pin.id)
       )
