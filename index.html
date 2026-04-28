@@ -23,6 +23,31 @@
         document.head.appendChild(link)
       })()
     </script>
+    <script>
+      // Load Plausible only on production hostnames to avoid polluting analytics during local dev.
+      (function loadPlausible() {
+        const host = (window.location && window.location.hostname) || ''
+        const isProdHost = host === 'feelvonroll.ch' || host === 'www.feelvonroll.ch'
+        if (!isProdHost) return
+
+        window.plausible =
+          window.plausible ||
+          function () {
+            ;(plausible.q = plausible.q || []).push(arguments)
+          }
+        plausible.init =
+          plausible.init ||
+          function (i) {
+            plausible.o = i || {}
+          }
+        plausible.init()
+
+        const s = document.createElement('script')
+        s.async = true
+        s.src = 'https://analytics.baets.ch/js/pa-iGqcFL0fvRTrFicZfvw0d.js'
+        document.head.appendChild(s)
+      })()
+    </script>
     <title>feelvonRoll</title>
   </head>
   <body>
